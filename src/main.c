@@ -14,9 +14,9 @@
 struct camera {
 	float yaw;
 	float pitch;
-	float center[3];
-	float up[3];
-	float eye[3];
+	vec3 center;
+	vec3 up;
+	vec3 eye;
 };
 
 enum {
@@ -37,23 +37,21 @@ static void view(struct camera *cam, float delta)
 	cam->pitch = (cam->pitch > 1.57) ? 1.57 : (cam->pitch < -1.57) ? -1.57 : cam->pitch;
 
 	/* point the camera in a direction based on mouse input */
-	cam->center[0] = cos(cam->yaw) * cos(cam->pitch);
-	cam->center[1] = sin(cam->pitch);
-	cam->center[2] = sin(cam->yaw) * cos(cam->pitch);		
-	vec3_normalize(cam->center);
+	cam->center.x = cos(cam->yaw) * cos(cam->pitch);
+	cam->center.y = sin(cam->pitch);
+	cam->center.z = sin(cam->yaw) * cos(cam->pitch);		
+	cam->center = vec3_normalize(cam->center);
 
-	vec3 cross;
-	vec3_cross(cam->center, cam->up, cross);
-	vec3_normalize(cross);
+	vec3 cross = vec3_crossn(cam->center, cam->up);
 
-	vec3_scale(cam->center, CAMERA_SPEED * delta);
-	vec3_scale(cross, CAMERA_SPEED * delta);
+	cam->center = vec3_scale(CAMERA_SPEED * delta, cam->center);
+	cross = vec3_scale(CAMERA_SPEED * delta, cross);
 
 	if(keystates != NULL) {
-	if(keystates[FORWARD]) vec3_add(cam->eye, cam->center, cam->eye);
-	if(keystates[BACKWARD]) vec3_sub(cam->eye, cam->center, cam->eye);
-	if(keystates[RIGHT]) vec3_add(cam->eye, cross, cam->eye);
-	if(keystates[LEFT]) vec3_sub(cam->eye, cross, cam->eye);
+	if(keystates[FORWARD]) cam->eye = vec3_sum(cam->eye, cam->center);
+	if(keystates[BACKWARD]) cam->eye = vec3_sub(cam->eye, cam->center);
+	if(keystates[RIGHT]) cam->eye = vec3_sum(cam->eye, cross);
+	if(keystates[LEFT]) cam->eye = vec3_sub(cam->eye, cross);
 	}
 }
 
@@ -83,12 +81,11 @@ int main(int argc, char *argv[])
 	GLuint cube_program = load_shaders(shaders);
 	struct mesh cube = make_cube_mesh();
 
-	mat4 project;
-	make_projection_matrix(project, 90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
+	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(cube_program);
-	glUniformMatrix4fv(glGetUniformLocation(cube_program, "project"), 1, GL_FALSE, project);
+	glUniformMatrix4fv(glGetUniformLocation(cube_program, "project"), 1, GL_FALSE, project.f);
 	mat4 model = IDENTITY_MATRIX;
-	glUniformMatrix4fv(glGetUniformLocation(cube_program, "model"), 1, GL_FALSE, model);
+	glUniformMatrix4fv(glGetUniformLocation(cube_program, "model"), 1, GL_FALSE, model.f);
 
 	struct camera cam = {
 		0.0, 0.0,
@@ -107,12 +104,11 @@ int main(int argc, char *argv[])
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		view(&cam, delta);
-		mat4 view = IDENTITY_MATRIX;
-		make_view_matrix(view, cam.eye, cam.center, cam.up);
+		mat4 view = make_view_matrix(cam.eye, cam.center, cam.up);
 
 		glUseProgram(cube_program);
 
-		glUniformMatrix4fv(glGetUniformLocation(cube_program, "view"), 1, GL_FALSE, view);
+		glUniformMatrix4fv(glGetUniformLocation(cube_program, "view"), 1, GL_FALSE, view.f);
 		glBindVertexArray(cube.VAO);
 		glDrawArrays(GL_TRIANGLES, 0, cube.vcount);
 

@@ -1,265 +1,262 @@
 #include <stdio.h>
+#include <assert.h>
 #include <math.h>
-#include <string.h>
+#include <float.h>
 #include "gmath.h"
 
-static void mult4x4(const mat4 a, const mat4 b, mat4 dest);
-static void rotmat(mat4 m1, mat4 m2, mat4 dest);
-static void identity(mat4 m);
-
-void vec3_normalize(vec3 vec)
+static void swap(float *a, float *b)
 {
-	float sum = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
-	float len = sqrt(sum);
-
-	vec[0] = vec[0] / len;
-	vec[1] = vec[1] / len;
-	vec[2] = vec[2] / len;
+	float tmp = *b;
+	*b = *a;
+	*a = tmp;
 }
 
-void vec3_cross(vec3 a, vec3 b, vec3 dest)
+/* clamp n to lie within the range [min, max] */
+float clamp(float n, float min, float max)
 {
-	dest[0] = a[1] * b[2] - a[2] * b[1];
-	dest[1] = a[2] * b[0] - a[0] * b[2];
-	dest[2] = a[0] * b[1] - a[1] * b[0];
+	if (n < min) return min;
+	if (n > max) return max;
+
+	return n;
 }
 
-void vec3_scale(vec3 vec, float scalar)
+float vec3_magnitude(vec3 v)
 {
-	vec[0] = scalar * vec[0];
-	vec[1] = scalar * vec[1];
-	vec[2] = scalar * vec[2];
+	float sum = v.x * v.x + v.y * v.y + v.z * v.z;
+	return sqrt(sum);
 }
 
-void vec3_add(vec3 a, vec3 b, vec3 dest) 
+
+float vec3_dot(vec3 a, vec3 b)
 {
-	dest[0] = a[0] + b[0];
-	dest[1] = a[1] + b[1];
-	dest[2] = a[2] + b[2];
+	return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-void vec3_sub(vec3 a, vec3 b, vec3 dest) 
+vec3 vec3_scale(float s, vec3 v)
 {
-	dest[0] = a[0] - b[0];
-	dest[1] = a[1] - b[1];
-	dest[2] = a[2] - b[2];
+	vec3 tmp = {s*v.x, s*v.y, s*v.z};
+	return tmp;
 }
 
-float vec3_dot(vec3 a, vec3 b) 
+vec3 vec3_normalize(vec3 v) 
 {
-	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+	float len = vec3_magnitude(v);
+	vec3 tmp = {v.x/len, v.y/len, v.z/len};
+	return tmp;
 }
 
-void vec3_crossn(vec3 a, vec3 b, vec3 dest) 
+vec3 vec3_sum(vec3 a, vec3 b)
 {
-	vec3_cross(a, b, dest);
-	vec3_normalize(dest);
+	vec3 tmp = {a.x + b.x, a.y + b.y, a.z + b.z};
+	return tmp;
 }
 
-void mat4_translate(mat4 matrix, vec3 translation)
+vec3 vec3_sub(vec3 a, vec3 b)
 {
-	vec4 v1 = {matrix[0]*translation[0], matrix[1]*translation[0], 
-		matrix[2]*translation[0], matrix[3]*translation[0]};
-	vec4 v2 = {matrix[4]*translation[1], matrix[5]*translation[1], 
-		matrix[6]*translation[1], matrix[7]*translation[1]};
-	vec4 v3 = {matrix[8]*translation[2], matrix[9]*translation[2], 
-		matrix[10]*translation[2], matrix[11]*translation[2]};
-
-	matrix[12] += v1[0];
-	matrix[13] += v1[1];
-	matrix[14] += v1[2];
-	matrix[15] += v1[3];
-
-	matrix[12] += v2[0];
-	matrix[13] += v2[1];
-	matrix[14] += v2[2];
-	matrix[15] += v2[3];
-
-	matrix[12] += v3[0];
-	matrix[13] += v3[1];
-	matrix[14] += v3[2];
-	matrix[15] += v3[3];
+	vec3 tmp = {a.x - b.x, a.y - b.y, a.z - b.z};
+	return tmp;
 }
 
-void mat4_scale(mat4 matrix, vec3 scale)
+vec3 vec3_cross(vec3 a, vec3 b)
 {
-	matrix[0] *= scale[0]; 
-	matrix[1] *= scale[0]; 
-	matrix[2] *= scale[0]; 
-	matrix[3] *= scale[0];
+	vec3 tmp;
+	tmp.x = a.y * b.z - a.z * b.y;
+	tmp.y = a.z * b.x - a.x * b.z;
+	tmp.z = a.x * b.y - a.y * b.x;
+
+	return tmp;
+}
+
+vec3 vec3_crossn(vec3 a, vec3 b)
+{
+	vec3 tmp;
+	tmp = vec3_cross(a, b);
+
+	return vec3_normalize(tmp);
+}
+
+float scalar_triple_product(vec3 u, vec3 v, vec3 w) 
+{
+	return vec3_dot(vec3_cross(u, v), w);
+}
+
+vec3 barycentric(vec3 a, vec3 b, vec3 c, vec3 p) 
+{
+	vec3 v0 = vec3_sub(b, a);
+	vec3 v1 = vec3_sub(c, a);
+	vec3 v2 = vec3_sub(p, a);
 	
-	matrix[4] *= scale[1]; 
-	matrix[5] *= scale[1]; 
-	matrix[6] *= scale[1]; 
-	matrix[7] *= scale[1];
+	float d00 = vec3_dot(v0, v0);
+	float d01 = vec3_dot(v0, v1);
+	float d11 = vec3_dot(v1, v1);
+	float d20 = vec3_dot(v2, v0);
+	float d21 = vec3_dot(v2, v1);
+
+	float denom = d00 * d11 - d01 * d01;
 	
-	matrix[8] *= scale[2]; 
-	matrix[9] *= scale[2]; 
-	matrix[10] *= scale[2]; 
-	matrix[11] *= scale[2];
+	float v = (d11 * d20 - d01 * d21) / denom;
+	float w = (d00 * d21 - d01 * d20) / denom;
+	float u = 1.0 - v - w;
+
+	vec3 tmp = {u, v, w};
+	return tmp;
 }
 
-void mat4_rotate(mat4 matrix, vec3 rotation)
+int pt_in_triangle(vec3 p, vec3 a, vec3 b, vec3 c)
 {
-	mat4_rotate_x(matrix, rotation[0]);
-	mat4_rotate_y(matrix, rotation[1]);
-	mat4_rotate_z(matrix, rotation[2]);
+	vec3 bc = barycentric(a, b, c, p);
+	return bc.y >= 0.0 && bc.z >= 0.0 && (bc.y + bc.z) <= 1.0;
 }
 
-void mat4_rotate_x(mat4 matrix, float angle)
+int test_ray_sphere(vec3 p, vec3 d, struct sphere s) 
 {
-	mat4 unit = IDENTITY_MATRIX; 
-	float c = cosf(angle);
-	float s = sinf(angle);
+	vec3 m = vec3_sub(p, s.c);
+	float c = vec3_dot(m, m) - s.r * s.r;
 
-	unit[5] = c;
-	unit[6] = s;
-	unit[9] = -s;
-	unit[10] = c;
+	// if there is one real root there must be an intersection
+	if (c <= 0.0)	return 1;
 
-	rotmat(matrix, unit, matrix);
+	// exit if r's origin outside s and r pointing away from s
+	float b = vec3_dot(m, d);
+	if (b > 0.0)	return 0;
+
+	// negative discriminant means ray misses the sphere
+	float discr = b*b - c;
+	if (discr < 0.0)	return 0;
+
+	return 1;
 }
 
-void mat4_rotate_y(mat4 matrix, float angle)
+int test_ray_AABB(vec3 p, vec3 d, struct AABB a)
 {
-	mat4 unit = IDENTITY_MATRIX; 
-	float c = cosf(angle);
-	float s = sinf(angle);
+	float tmin = 0.0f;
+	float tmax = FLT_MAX;
+	vec3 min = {a.c.x - a.r[0], a.c.y - a.r[1], a.c.z - a.r[2]};
+	vec3 max = {a.c.x + a.r[0], a.c.y + a.r[1], a.c.z + a.r[2]};
 
-	unit[0] = c;
-	unit[2] = -s;
-	unit[8] = s;
-	unit[10] = c;
+	for(int i = 0; i < 3; i++) {
+		if (fabs(d.f[i]) < FLT_EPSILON) {
+			// ray is parallel to slab
+			if (p.f[i] < min.f[i] || p.f[i] > max.f[i])	return 0;
+		} else {
+			float ood = 1.0 / d.f[i];
+			float t1 = (min.f[i] - p.f[i]) * ood;
+			float t2 = (max.f[i] - p.f[i]) * ood;
 
-	rotmat(matrix, unit, matrix);
+			if (t1 > t2)	swap(&t1, &t2);
+
+			if (t1 > tmin)	tmin = t1;
+			if (t2 > tmax)	tmax = t2;
+
+			if (tmin > tmax)	return 0;
+		}
+	}
+	
+	return 1;
 }
 
-void mat4_rotate_z(mat4 matrix, float angle)
+/* COUNTER CLOCKWISE */
+int test_ray_triangle(vec3 p, vec3 q, vec3 a, vec3 b, vec3 c)
 {
-	mat4 unit = IDENTITY_MATRIX; 
-	float c = cosf(angle);
-	float s = sinf(angle);
+	vec3 bc = vec3_sub(b, c);
+	vec3 ac = vec3_sub(a, c);
+	vec3 qp = vec3_sub(p, q);
 
-	unit[0] = c;
-	unit[1] = s;
-	unit[4] = -s;
-	unit[5] = c;
+	vec3 n = vec3_cross(bc, ac);
 
-	rotmat(matrix, unit, matrix);
+	float d = vec3_dot(qp, n);
+	if (d <= 0.0)	return 0;
+
+	vec3 ap = vec3_sub(p, c);
+	float t = vec3_dot(ap, n);
+	if (t < 0.0)	return 0;
+
+	vec3 e = vec3_cross(qp, ap);
+	float v = vec3_dot(ac, e);
+	if (v < 0.0 || v > d)	return 0;
+	float w = -vec3_dot(bc, e);
+	if (w < 0.0 || v + w > d)	return 0;
+
+	return 1;
 }
 
-void make_projection_matrix(mat4 matrix, int angle, float aspect, float near, float far)
+vec3 barycentric_ray_triangle(vec3 p, vec3 q, vec3 a, vec3 b, vec3 c)
 {
-	float fov = (float)angle * ((2.0 * M_PI) / 360.0);
-	float range = tan(fov * 0.5) * near;
+	vec3 tmp;
+
+	vec3 bc = vec3_sub(b, c);
+	vec3 ac = vec3_sub(a, c);
+	vec3 qp = vec3_sub(p, q);
+
+	vec3 n = vec3_cross(bc, ac);
+	float d = vec3_dot(qp, n);	
+
+	vec3 ap = vec3_sub(p, c);
+	vec3 e = vec3_cross(qp, ap);
+	tmp.y = vec3_dot(ac, e);
+	tmp.z = -vec3_dot(bc, e);
+
+	float ood = 1.0 / d;
+
+	tmp.y *= ood;
+	tmp.z *= ood;
+	tmp.x = 1.0 - tmp.y - tmp.z;
+
+	return tmp;
+}
+
+vec3 barycentric_to_cartesian(vec3 bar, vec3 a, vec3 b, vec3 c)
+{
+	vec3 tmp;
+
+	vec3 ca = vec3_sub(a, c);
+	vec3 cb = vec3_sub(b, c);
+
+	ca = vec3_scale(bar.x, ca);
+	cb = vec3_scale(bar.y, cb);
+
+	tmp = vec3_sum(c, ca);
+	tmp = vec3_sum(tmp, cb);
+
+	return tmp;
+}
+
+mat4 make_project_matrix(int fov, float aspect, float near, float far)
+{
+	float rad = (float)fov * ((2.0 * M_PI) / 360.0);
+	float range = tan(0.5 * rad) * near;
 
 	float x = (2.0 * near) / (range * aspect + range * aspect);
 	float y = near / range;
 	float z = -(far + near) / (far - near);
 	float w = -(2.0 * far * near) / (far - near);
 
-	const mat4 temp = {
+	mat4 project = {
 		x, 0.0, 0.0, 0.0,
 		0.0, y, 0.0, 0.0,
 		0.0, 0.0, z, -1.0,
 		0.0, 0.0, w, 0.0
 	};
 
-	memcpy(matrix, temp, sizeof(mat4));
+	return project;
 }
 
-void make_view_matrix(mat4 matrix, vec3 eye, vec3 center, vec3 up)
+mat4 make_view_matrix(vec3 eye, vec3 center, vec3 up)
 {
-	vec3 target = {0};
-	vec3_add(eye, center, target);
-	vec3 f, u, s;
+	vec3 target = vec3_sum(eye, center);
 
-	vec3_sub(target, eye, f);
-	vec3_normalize(f);
+	vec3 f = vec3_sub(target, eye);
+	f = vec3_normalize(f);
 
-	vec3_crossn(f, up, s);
-	vec3_cross(s, f, u);
+	vec3 s = vec3_crossn(f, up);
+	vec3 u = vec3_cross(s, f);
 
-	matrix[0] = s[0];
-	matrix[1] = u[0];
-	matrix[2] = -f[0];
-	matrix[4] = s[1];
-	matrix[5] = u[1];
-	matrix[6] = -f[1];
-	matrix[7] = 0.0f;
-	matrix[8] = s[2];
-	matrix[9] = u[2];
-	matrix[10] = -f[2];
-	matrix[11] = 0.0f;
-	matrix[12] = -vec3_dot(s, eye);
-	matrix[13] = -vec3_dot(u, eye);
-	matrix[14] = vec3_dot(f, eye);
-	matrix[15] = 1.0f;
-}
-
-static void mult4x4(const mat4 a, const mat4 b, mat4 dest)
-{
-	dest[0] = a[0]*b[0] + a[1]*b[4] + a[2]*b[8] + a[3]*b[12];
-	dest[1] = a[0]*b[1] + a[1]*b[5] + a[2]*b[9] + a[3]*b[13];
-	dest[2] = a[0]*b[2] + a[1]*b[6] + a[2]*b[10] + a[3]*b[14];
-	dest[3] = a[0]*b[3] + a[1]*b[7] + a[2]*b[11] + a[3]*b[15];
-
-	dest[4] = a[4]*b[0] + a[5]*b[4] + a[6]*b[8] + a[7]*b[12];
-	dest[5] = a[4]*b[1] + a[5]*b[5] + a[6]*b[9] + a[7]*b[13];
-	dest[6] = a[4]*b[2] + a[5]*b[6] + a[6]*b[10] + a[7]*b[14];
-	dest[7] = a[4]*b[3] + a[5]*b[7] + a[6]*b[11] + a[7]*b[15];
-
-	dest[8] = a[8]*b[0] + a[9]*b[4] + a[10]*b[8] + a[11]*b[12];
-	dest[9] = a[8]*b[1] + a[9]*b[5] + a[10]*b[9] + a[11]*b[13];
-	dest[10] = a[8]*b[2] + a[9]*b[6] + a[10]*b[10] + a[11]*b[14];
-	dest[11] = a[8]*b[3] + a[9]*b[7] + a[10]*b[11] + a[11]*b[15];
-
-	dest[12] = a[12]*b[0] + a[13]*b[4] + a[14]*b[8] + a[15]*b[12];
-	dest[13] = a[12]*b[1] + a[13]*b[5] + a[14]*b[9] + a[15]*b[13];
-	dest[14] = a[12]*b[2] + a[13]*b[6] + a[14]*b[10] + a[15]*b[14];
-	dest[15] = a[12]*b[3] + a[13]*b[7] + a[14]*b[11] + a[15]*b[15];
-}
-
-static void rotmat(mat4 m1, mat4 m2, mat4 dest)
-{
-	float a00 = m1[0], a01 = m1[1], a02 = m1[2], a03 = m1[3],
-        a10 = m1[4], a11 = m1[5], a12 = m1[6], a13 = m1[7],
-        a20 = m1[8], a21 = m1[9], a22 = m1[10], a23 = m1[11],
-        a30 = m1[12], a31 = m1[13], a32 = m1[14], a33 = m1[15],
-
-        b00 = m2[0], b01 = m2[1], b02 = m2[2],
-        b10 = m2[4], b11 = m2[5], b12 = m2[6],
-        b20 = m2[8], b21 = m2[9], b22 = m2[10];
-
-	dest[0] = a00 * b00 + a10 * b01 + a20 * b02;
-	dest[1] = a01 * b00 + a11 * b01 + a21 * b02;
-	dest[2] = a02 * b00 + a12 * b01 + a22 * b02;
-	dest[3] = a03 * b00 + a13 * b01 + a23 * b02;
-
-	dest[4] = a00 * b10 + a10 * b11 + a20 * b12;
-	dest[5] = a01 * b10 + a11 * b11 + a21 * b12;
-	dest[6] = a02 * b10 + a12 * b11 + a22 * b12;
-	dest[7] = a03 * b10 + a13 * b11 + a23 * b12;
-
-	dest[8] = a00 * b20 + a10 * b21 + a20 * b22;
-	dest[9] = a01 * b20 + a11 * b21 + a21 * b22;
-	dest[10] = a02 * b20 + a12 * b21 + a22 * b22;
-	dest[11] = a03 * b20 + a13 * b21 + a23 * b22;
-
-	dest[12] = a30;
-	dest[13] = a31;
-	dest[14] = a32;
-	dest[15] = a33;
-}
-
-static void identity(mat4 m)
-{
-	mat4 temp = {
-		1.0, 0.0, 0.0, 0.0,
-		0.0, 1.0, 0.0, 0.0,
-		0.0, 0.0, 1.0, 0.0,
-		0.0, 0.0, 0.0, 1.0
+	mat4 view = {
+		s.f[0], u.f[0], -f.f[0], 0.0,
+		s.f[1], u.f[1], -f.f[1], 0.0,
+		s.f[2], u.f[2], -f.f[2], 0.0,
+		-vec3_dot(s, eye), -vec3_dot(u, eye), vec3_dot(f, eye), 1.0
 	};
 
-	memcpy(m, temp, sizeof(mat4));
+	return view;
 }

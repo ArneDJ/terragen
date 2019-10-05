@@ -1,70 +1,53 @@
 #define IDENTITY_MATRIX {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
 
-typedef float vec2[2];
-typedef float vec3[3]; /* vector of 3 elements */
-typedef float vec4[4]; /* vector of 4 elements */
+typedef union {
+	float f[2];
+	struct { float x, y; };
+} vec2;
 
-typedef float mat2[4]; /* 2 by 2 matrix */
-typedef float mat3[9]; /* 3 by 3 matrix */
-typedef float mat4[16]; /* 4 by 4 matrix */
+typedef union {
+	float f[3];
+	struct { float x, y, z; };
+} vec3;
 
-/* normalizes a vector vec into a unit vector */
-/* param: vec - the vector to normalize */
-void vec3_normalize(vec3 vec);
+typedef union {
+	float f[4];
+	struct { float x, y, z, w; };
+} vec4;
 
- /* calculate the cross product of vectors a and b */
- /* param: a - left operand */
- /* param: b - right operand */
- /* param: dest - the result is stored in vector dest */
-void vec3_cross(vec3 a, vec3 b, vec3 dest);
+typedef union {
+	float f[9];
+	vec3 row[3];
+} mat3;
 
-/* normalizes the cross product of two products */
-/* param: a - left operand vector */
-/* param: b - right operand vector */
-/* param: dest - the normalized cross product is stored in dest */
-void vec3_crossn(vec3 a, vec3 b, vec3 dest);
+typedef union {
+	float f[16];
+	vec4 row[4];
+} mat4;
 
-/* scale a vector with a scalar */
-/* param: src - the vector to scale */
-/* param: scalar - the value to scale the vector with */
-void vec3_scale(vec3 src, float scalar);
+struct sphere {
+	vec3 c; // sphere center
+	float r; // sphere radius
+};
 
-/* sum of two vectors */
-/* param: a - left operand */
-/* param: b - right operand */
-/* param: deset - result is stored in dest */
-void vec3_add(vec3 a, vec3 b, vec3 dest); 
+struct AABB {
+	vec3 c; // center point of AABB
+	float r[3]; // radius or halfwidth extents (rx, ry, rz)
+};
 
-/* substract a vector by another one */ 
-/* param: a - vector to substract from */
-/* param: b - vector to substract */
-/* param: dest - result of the substraction is stored in dest */
-void vec3_sub(vec3 a, vec3 b, vec3 dest); 
+struct OBB {
+	vec3 c; // OBB center point
+	vec3 u[3]; // local x, y, z axes
+	vec3 e; // positive halfwidth extends of OBB along each axis
+};
 
-/* calculate the dot product of two vectors */
-/* param: a - left operand vector */
-/* param: b - right operand vector */
-/* return: the calculated cross product */
-float vec3_dot(vec3 a, vec3 b); 
+vec3 vec3_scale(float s, vec3 v);
+vec3 vec3_normalize(vec3 v);
+vec3 vec3_sum(vec3 a, vec3 b);
+vec3 vec3_sub(vec3 a, vec3 b);
+vec3 vec3_cross(vec3 a, vec3 b);
+vec3 vec3_crossn(vec3 a, vec3 b);
 
-/* transforms a 4 by 4 matrix by a vector translation */
-/* param: matrix - the matrix to translate */
-/* param: translation - translation vector */
-void mat4_translate(mat4 matrix, vec3 translation);
+mat4 make_project_matrix(int fov, float aspect, float near, float far);
 
-/* scales a 4 by 4 matrix by a vector */
-void mat4_scale(mat4 matrix, vec3 scale);
-
-/* rotates a 4 by 4 matrix by a vector */
-void mat4_rotate(mat4 matrix, vec3 rotation);
-
-/* rotate the 4 by 4 matrix by a certain angle in radians */
-void mat4_rotate_x(mat4 matrix, float angle);
-void mat4_rotate_y(mat4 matrix, float angle);
-void mat4_rotate_z(mat4 matrix, float angle);
-
-/* creates a perspective projection matrix */
-void make_projection_matrix(mat4 matrix, int angle, float aspect, float near, float far);
-
-/* creates a viewing transform matrix, also known as lookat function */
-void make_view_matrix(mat4 matrix, vec3 eye, vec3 center, vec3 up);
+mat4 make_view_matrix(vec3 eye, vec3 center, vec3 up);
