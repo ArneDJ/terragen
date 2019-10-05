@@ -1,3 +1,10 @@
+# Compiled names
+main
+demo
+
+# Vim
+*.swp
+
 # Prerequisites
 *.d
 

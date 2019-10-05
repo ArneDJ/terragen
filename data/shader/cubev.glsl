@@ -8,7 +8,7 @@ uniform mat4 view, model, project;
 
 void main(void)
 {
-	gl_Position = vec4(vpos, 1.0);
+	gl_Position = project * view * model * vec4(vpos, 1.0);
 }
 
 
