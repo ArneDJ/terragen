@@ -51,3 +51,7 @@ vec3 vec3_crossn(vec3 a, vec3 b);
 mat4 make_project_matrix(int fov, float aspect, float near, float far);
 
 mat4 make_view_matrix(vec3 eye, vec3 center, vec3 up);
+
+mat4 identity_matrix(void);
+
+void mat4_translate(mat4 *m, vec3 v);

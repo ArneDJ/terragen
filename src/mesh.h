@@ -12,3 +12,5 @@ struct mesh {
 };
 
 struct mesh make_cube_mesh(void);
+
+void instance_mesh(struct mesh *m, int amount, vec3 *positions);

@@ -260,3 +260,10 @@ mat4 make_view_matrix(vec3 eye, vec3 center, vec3 up)
 
 	return view;
 }
+
+void mat4_translate(mat4 *m, vec3 v)
+{
+	m->f[12] = v.x;
+	m->f[13] = v.y;
+	m->f[14] = v.z;
+}

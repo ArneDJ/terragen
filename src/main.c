@@ -3,9 +3,9 @@
 #include <SDL2/SDL.h>
 #include <GL/glew.h>
 #include <GL/gl.h>
+#include "gmath.h"
 #include "shader.h"
 #include "mesh.h"
-#include "gmath.h"
 #include "camera.h"
 
 #define WINDOW_WIDTH 1280
@@ -34,8 +34,17 @@ int main(int argc, char *argv[])
 		{GL_FRAGMENT_SHADER, "data/shader/cubef.glsl"},
 		{GL_NONE, NULL}
 	};
+
+	vec3 *positions = calloc(1000, sizeof(vec3));
+	for(int i = 0; i < 1000; i++) {
+		positions[i].x = (float)i;
+		positions[i].y = (float)i;
+		positions[i].z = (float)i+1;
+	}
 	GLuint cube_program = load_shaders(shaders);
 	struct mesh cube = make_cube_mesh();
+	instance_mesh(&cube, 1000, positions);
+	free(positions);
 
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(cube_program);
@@ -61,7 +70,7 @@ int main(int argc, char *argv[])
 
 		glUniformMatrix4fv(glGetUniformLocation(cube_program, "view"), 1, GL_FALSE, view.f);
 		glBindVertexArray(cube.VAO);
-		glDrawArrays(GL_TRIANGLES, 0, cube.vcount);
+		glDrawArraysInstanced(GL_TRIANGLES, 0, cube.vcount, 1000);
 
 		SDL_GL_SwapWindow(window);
 		end = start;
