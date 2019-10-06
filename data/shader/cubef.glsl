@@ -1,6 +1,10 @@
 #version 460 core
 
+uniform sampler2D tex;
+
+in vec2 uv;
+
 void main(void)
 {
-	gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+	gl_FragColor = texture(tex, uv);
 }
