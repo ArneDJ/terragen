@@ -40,6 +40,77 @@ struct mesh make_cube_mesh(void)
 	return m;
 }
 
+static struct vertex make_plane_vertex(float x, float y, float z)
+{
+	struct vertex v;
+	v.position.x = x;
+	v.position.y = y;
+	v.position.z = z;
+
+	v.normal.x = 0.0;
+	v.normal.y = 1.0;
+	v.normal.z = 0.0;
+
+	v.uv.x = x;
+	v.uv.y = z;
+
+	return v;
+}
+
+struct mesh make_grid_mesh(int width, int length, float offset)
+{
+	struct mesh m;
+	m.vcount = 3 * 2 * width * length;
+	struct vertex *v = calloc(m.vcount, sizeof(struct vertex));
+
+	vec2 origin = {0.0, 0.0};
+	int n = 0;
+	for(int i = 0; i < width; i++) {
+		for(int j = 0; j < length; j++) {
+			v[n++] = make_plane_vertex(origin.x+offset, 0.0, origin.y+offset);
+			v[n++] = make_plane_vertex(origin.x+offset, 0.0, origin.y);
+			v[n++] = make_plane_vertex(origin.x, 0.0, origin.y);
+			v[n++] = make_plane_vertex(origin.x, 0.0, origin.y+offset);
+			v[n++] = make_plane_vertex(origin.x+offset, 0.0, origin.y+offset);
+			v[n++] = make_plane_vertex(origin.x, 0.0, origin.y);
+
+			origin.x += offset;
+		}
+		origin.x = 0.0;
+		origin.y += offset;
+	}
+
+	glGenVertexArrays(1, &m.VAO);
+	glBindVertexArray(m.VAO);
+
+	GLuint vbo;
+	glGenBuffers(1, &vbo);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, m.vcount * sizeof(struct vertex), v, GL_STATIC_DRAW);
+
+	/* vertex points */
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(struct vertex), BUFFER_OFFSET(0));
+
+	/* normals */
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(struct vertex), BUFFER_OFFSET(3*sizeof(float)));
+
+	/* texture uv */
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(struct vertex), BUFFER_OFFSET(6*sizeof(float)));
+
+	glBindVertexArray(0);
+	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(1);
+	glDisableVertexAttribArray(2);
+	glDeleteBuffers(1, &vbo);
+
+	free(v);
+	return m;
+}
+
 void instance_mesh(struct mesh *m, int amount, vec3 *positions)
 {
 	mat4 *model = calloc(amount, sizeof(mat4));
@@ -76,8 +147,3 @@ void instance_mesh(struct mesh *m, int amount, vec3 *positions)
 	free(model);
 }
 
-mat4 identity_matrix(void)
-{
-	mat4 tmp = IDENTITY_MATRIX;
-	return tmp;
-}

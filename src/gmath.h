@@ -41,6 +41,7 @@ struct OBB {
 	vec3 e; // positive halfwidth extends of OBB along each axis
 };
 
+vec3 vec3_make(float x, float y, float z);
 vec3 vec3_scale(float s, vec3 v);
 vec3 vec3_normalize(vec3 v);
 vec3 vec3_sum(vec3 a, vec3 b);
@@ -55,3 +56,4 @@ mat4 make_view_matrix(vec3 eye, vec3 center, vec3 up);
 mat4 identity_matrix(void);
 
 void mat4_translate(mat4 *m, vec3 v);
+mat4 identity_matrix(void);

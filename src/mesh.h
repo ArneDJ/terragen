@@ -1,9 +1,9 @@
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
 struct vertex {
-	float position[3];
-	float normal[3];
-	float uv[2];
+	vec3 position;
+	vec3 normal;
+	vec2 uv;
 };
 
 struct mesh {
@@ -12,5 +12,6 @@ struct mesh {
 };
 
 struct mesh make_cube_mesh(void);
+struct mesh make_grid_mesh(int width, int length, float offset);
 
 void instance_mesh(struct mesh *m, int amount, vec3 *positions);

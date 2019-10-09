@@ -20,6 +20,12 @@ float clamp(float n, float min, float max)
 	return n;
 }
 
+vec3 vec3_make(float x, float y, float z)
+{
+	vec3 v = {x, y, z};
+	return v;
+}
+
 float vec3_magnitude(vec3 v)
 {
 	float sum = v.x * v.x + v.y * v.y + v.z * v.z;
@@ -252,9 +258,9 @@ mat4 make_view_matrix(vec3 eye, vec3 center, vec3 up)
 	vec3 u = vec3_cross(s, f);
 
 	mat4 view = {
-		s.f[0], u.f[0], -f.f[0], 0.0,
-		s.f[1], u.f[1], -f.f[1], 0.0,
-		s.f[2], u.f[2], -f.f[2], 0.0,
+		s.x, u.x, -f.x, 0.0,
+		s.y, u.y, -f.y, 0.0,
+		s.z, u.z, -f.z, 0.0,
 		-vec3_dot(s, eye), -vec3_dot(u, eye), vec3_dot(f, eye), 1.0
 	};
 
@@ -266,4 +272,10 @@ void mat4_translate(mat4 *m, vec3 v)
 	m->f[12] = v.x;
 	m->f[13] = v.y;
 	m->f[14] = v.z;
+}
+
+mat4 identity_matrix(void)
+{
+	mat4 tmp = IDENTITY_MATRIX;
+	return tmp;
 }
