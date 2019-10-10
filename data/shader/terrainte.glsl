@@ -3,6 +3,7 @@
 layout(triangles) in;
 uniform sampler2D heightmap;
 uniform mat4 model, view, project;
+uniform float amplitude = 8.0;
 
 out vec3 bump;
 out vec3 fpos;
@@ -13,10 +14,10 @@ vec3 filter_normal(vec2 uv, float texel_size)
 	vec4 h;
 	ivec2 off1 = ivec2(10, 0);
 	ivec2 off2 = ivec2(-10, 0);
-	h.x = 10.0 * textureOffset(heightmap, uv * texel_size, off2.yx).r;
-	h.y = 10.0 * textureOffset(heightmap, uv * texel_size, off2.xy).r;
-	h.z = 10.0 * textureOffset(heightmap, uv * texel_size, off1.xy).r;
-	h.w = 10.0 * textureOffset(heightmap, uv * texel_size, off1.yx).r;
+	h.x = amplitude * textureOffset(heightmap, uv * texel_size, off2.yx).r;
+	h.y = amplitude * textureOffset(heightmap, uv * texel_size, off2.xy).r;
+	h.z = amplitude * textureOffset(heightmap, uv * texel_size, off1.xy).r;
+	h.w = amplitude * textureOffset(heightmap, uv * texel_size, off1.yx).r;
 	vec3 n;
 	n.z = h.x - h.w;
 	n.x = h.y - h.z;
@@ -35,7 +36,7 @@ void main(void)
 	float height = texture(heightmap, uv * 0.015625).r;
 	bump = filter_normal(uv, 0.015625);
 	vec3 newpos = gl_Position.xyz;
-	newpos.y = height * 10.0;
+	newpos.y = amplitude * height;
 	gl_Position = project * view * model * vec4(newpos, 1.0);
 }
 

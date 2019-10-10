@@ -76,6 +76,8 @@ int main(int argc, char *argv[])
 	GLuint heightmap_texture = load_dds_texture("data/texture/heightmap.dds");
 	GLuint grass_texture = load_dds_texture("data/texture/grass.dds");
 	GLuint stone_texture = load_dds_texture("data/texture/stone.dds");
+	GLuint water_texture = load_dds_texture("data/texture/water.dds");
+	GLuint water_n_texture = load_dds_texture("data/texture/water_n.dds");
 
 	struct mesh skybox = make_cube_mesh();
 	struct mesh plane = make_grid_mesh(64, 64, 1.0);
@@ -130,13 +132,23 @@ int main(int argc, char *argv[])
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		//
 		//
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glUseProgram(water_program);
 		glUniform1f(glGetUniformLocation(water_program, "time"), start);
+		glUniform3fv(glGetUniformLocation(water_program, "view_dir"), 1, cam.center.f);
+		glUniform3fv(glGetUniformLocation(water_program, "eye"), 1, cam.eye.f);
+		glUniform2f(glGetUniformLocation(water_program,  "gerstner_waves[0].direction"), 1.0f, 0.0f);
+		glUniform1f(glGetUniformLocation(water_program,  "gerstner_waves[0].amplitude"), 0.1);
+		glUniform1f(glGetUniformLocation(water_program,  "gerstner_waves[0].steepness"), 0.5);
+		glUniform1f(glGetUniformLocation(water_program,  "gerstner_waves[0].frequency"), 1.0);
+		glUniform1f(glGetUniformLocation(water_program,  "gerstner_waves[0].speed"),     1.0);
+		glUniform1ui(glGetUniformLocation(water_program, "gerstner_waves_length"),       2);
 		glUniformMatrix4fv(glGetUniformLocation(water_program, "view"), 1, GL_FALSE, view.f);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, water_n_texture);
 		glBindVertexArray(plane.VAO);
 		glDrawArrays(GL_PATCHES, 0, plane.vcount);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 		vec3 fcolor = {1.0, 0.0, 0.0};
 		vec3 p = {10.0, 10.0, 10.0};
