@@ -133,12 +133,15 @@ int test_ray_sphere(vec3 p, vec3 d, struct sphere s)
 	return 1;
 }
 
+/*
 int test_ray_AABB(vec3 p, vec3 d, struct AABB a)
 {
 	float tmin = 0.0f;
 	float tmax = FLT_MAX;
-	vec3 min = {a.c.x - a.r[0], a.c.y - a.r[1], a.c.z - a.r[2]};
-	vec3 max = {a.c.x + a.r[0], a.c.y + a.r[1], a.c.z + a.r[2]};
+	//vec3 min = {a.c.x - a.r[0], a.c.y - a.r[1], a.c.z - a.r[2]};
+	//vec3 max = {a.c.x + a.r[0], a.c.y + a.r[1], a.c.z + a.r[2]};
+	vec3 min = {-0.5, -0.5, -0.5};
+	vec3 max = {0.5, 0.5, 0.5};
 
 	for(int i = 0; i < 3; i++) {
 		if (fabs(d.f[i]) < FLT_EPSILON) {
@@ -158,6 +161,51 @@ int test_ray_AABB(vec3 p, vec3 d, struct AABB a)
 		}
 	}
 	
+	return 1;
+}
+*/
+
+int test_ray_AABB(vec3 p, vec3 d, struct AABB a)
+{
+	vec3 min = {a.c.x - a.r[0], a.c.y - a.r[1], a.c.z - a.r[2]};
+	vec3 max = {a.c.x + a.r[0], a.c.y + a.r[1], a.c.z + a.r[2]};
+
+	float tmin = (min.x - p.x) / d.x;
+	float tmax = (max.x - p.x) / d.x;
+
+	if (tmin > tmax) 
+		swap(&tmin, &tmax);
+
+	float tymin = (min.y - p.y) / d.y;
+	float tymax = (max.y - p.y) / d.y;
+
+	if (tymin > tymax) 
+		swap(&tymin, &tymax);
+
+	if ((tmin > tymax) || (tymin > tmax))	
+		return 0;
+
+	if (tymin > tmin)
+		tmin = tymin;
+
+	if (tymax < tmax)
+		tmax = tymax;
+
+	float tzmin = (min.z - p.z) / d.z;
+	float tzmax = (max.z - p.z) / d.z;
+
+	if (tzmin > tzmax) 
+		swap(&tzmin, &tzmax);
+
+	if ((tmin > tzmax) || (tzmin > tmax))
+		return 0;
+
+	if (tzmin > tmin)
+		tmin = tzmin;
+
+	if (tzmax < tmax)
+		tmax = tzmax;
+
 	return 1;
 }
 

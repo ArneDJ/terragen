@@ -1,6 +1,7 @@
 #version 460 core
 
 uniform sampler2D tex;
+uniform vec3 fcolor;
 
 in vec3 norm;
 in vec2 uv;
@@ -13,5 +14,5 @@ void main(void)
 	float exposure = max(dot(norm, sun_dir), 0.6);
 	boxf.xyz *= exposure;
 
-	gl_FragColor = boxf;
+	gl_FragColor = vec4(fcolor, 1.0);
 }

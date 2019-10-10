@@ -57,3 +57,5 @@ mat4 identity_matrix(void);
 
 void mat4_translate(mat4 *m, vec3 v);
 mat4 identity_matrix(void);
+int test_ray_AABB(vec3 p, vec3 d, struct AABB a);
+int test_ray_sphere(vec3 p, vec3 d, struct sphere s);
