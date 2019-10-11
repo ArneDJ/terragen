@@ -13,14 +13,14 @@ GLuint load_dds_texture(const char *fpath)
 	/* load the texture image from dds */
 	struct dds header;
 	FILE *fp = fopen(fpath, "rb");
-	if(fp == NULL) {
+	if (fp == NULL) {
 		perror(fpath);
 		return 0;
 	}
 
 	/* verify the type of file */
 	fread(header.identifier, 1, 4, fp);
-	if(strncmp(header.identifier, "DDS ", 4) != 0) {
+	if (strncmp(header.identifier, "DDS ", 4) != 0) {
 		printf("error: %s: not a valid DDS file\n", fpath);
 		fclose(fp);
 		return 0;
@@ -45,11 +45,14 @@ GLuint load_dds_texture(const char *fpath)
 	uint32_t components = (header.dxt_codec == FOURCC_DXT1) ? 3 : 4;
 	uint32_t format;
 	uint32_t block_size;
-	switch(header.dxt_codec) {
+	switch (header.dxt_codec) {
 	case FOURCC_DXT1: format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT; block_size = 8; break;
 	case FOURCC_DXT3: format = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT; block_size = 16; break;
 	case FOURCC_DXT5: format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT; block_size = 16; break;
-	default: printf("error: not a valid DXT format found for %s\n", fpath); free(image); return 0;
+	default: 
+		printf("error: not a valid DXT format found for %s\n", fpath); 
+		free(image); 
+		return 0;
 	};
 
 	/* now make the opengl texture */
@@ -64,8 +67,8 @@ GLuint load_dds_texture(const char *fpath)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
 	unsigned int offset = 0;
-	for(unsigned int i = 0; i < header.mip_levels; i++) {
-		if(header.width <= 4 || header.height <= 4) {
+	for (unsigned int i = 0; i < header.mip_levels; i++) {
+		if (header.width <= 4 || header.height <= 4) {
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, i-1);
 			break;
 		}
@@ -94,11 +97,10 @@ GLuint make_heightmap_texture(void)
 	pixel *image = calloc(len, sizeof(pixel));
 
 	int n = 0;
-	for(int y = 0; y < 1024; y++) {
-		for(int x = 0; x < 1024; x++) {
+	for (int y = 0; y < 1024; y++) {
+		for (int x = 0; x < 1024; x++) {
 			float z = fbm_noise(x, y);
-			if(z < 0.5)	
-				z = 0.0;
+//			if(z < 0.5)	z = 0.0;
 			image[n][0] = 256 * z;
 			image[n][1] = 256 * z;
 			image[n][2] = 256 * z;
@@ -108,9 +110,12 @@ GLuint make_heightmap_texture(void)
 
 	glGenTextures(1, &texnum);
 	glBindTexture(GL_TEXTURE_2D, texnum);
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 1024, 1024);
+	//glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB16, 1024, 1024);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, 1024, 1024);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1024, 1024, GL_RGB, GL_UNSIGNED_BYTE, image[0]);
 	//glTexImage2D(GL_TEXTURE_2D, 1, GL_RGB, 1024, 1024, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 	free(image);

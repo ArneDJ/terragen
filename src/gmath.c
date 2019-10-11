@@ -11,9 +11,14 @@ static void swap(float *a, float *b)
 	*a = tmp;
 }
 
-float fract(float fraction)
+float lerp(float a, float b, float t) 
 {
-	return fraction - floorf(fraction);
+	return (1.0 - t) * a + t * b;
+}
+
+float fract(float x)
+{
+	return x - floorf(x);
 }
 
 /* clamp n to lie within the range [min, max] */
@@ -36,7 +41,6 @@ float vec3_magnitude(vec3 v)
 	float sum = v.x * v.x + v.y * v.y + v.z * v.z;
 	return sqrt(sum);
 }
-
 
 float vec3_dot(vec3 a, vec3 b)
 {
@@ -125,15 +129,18 @@ int test_ray_sphere(vec3 p, vec3 d, struct sphere s)
 	float c = vec3_dot(m, m) - s.r * s.r;
 
 	// if there is one real root there must be an intersection
-	if (c <= 0.0)	return 1;
+	if (c <= 0.0)	
+		return 1;
 
 	// exit if r's origin outside s and r pointing away from s
 	float b = vec3_dot(m, d);
-	if (b > 0.0)	return 0;
+	if (b > 0.0)	
+		return 0;
 
 	// negative discriminant means ray misses the sphere
 	float discr = b*b - c;
-	if (discr < 0.0)	return 0;
+	if (discr < 0.0)	
+		return 0;
 
 	return 1;
 }
@@ -224,17 +231,22 @@ int test_ray_triangle(vec3 p, vec3 q, vec3 a, vec3 b, vec3 c)
 	vec3 n = vec3_cross(bc, ac);
 
 	float d = vec3_dot(qp, n);
-	if (d <= 0.0)	return 0;
+	if (d <= 0.0)	
+		return 0;
 
 	vec3 ap = vec3_sub(p, c);
 	float t = vec3_dot(ap, n);
-	if (t < 0.0)	return 0;
+	if (t < 0.0)	
+		return 0;
 
 	vec3 e = vec3_cross(qp, ap);
 	float v = vec3_dot(ac, e);
-	if (v < 0.0 || v > d)	return 0;
+	if (v < 0.0 || v > d)	
+		return 0;
+
 	float w = -vec3_dot(bc, e);
-	if (w < 0.0 || v + w > d)	return 0;
+	if (w < 0.0 || v + w > d)	
+		return 0;
 
 	return 1;
 }

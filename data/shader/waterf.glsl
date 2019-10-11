@@ -29,5 +29,5 @@ void main(void)
 	vec3 eyeDirection = normalize(worldToEye);
 	sunLight(bump.xyz, eyeDirection, 100.0, 2.0, 0.5, diffuse, specular);
 
-	gl_FragColor = vec4((diffuse+specular+vec3(0.1))*vec3(0.0, 0.46, 0.74), 1.0);
+	gl_FragColor = vec4((diffuse+specular+vec3(0.1))*waterColor, 1.0);
 }

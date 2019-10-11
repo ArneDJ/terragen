@@ -8,10 +8,12 @@
 
 static int SEED;
 
+/*
 static float lerp(float a, float b, float s)
 {
 	return a + s * (b - a);
 }
+*/
 
 static int permutation(int x, int y)
 {
@@ -55,13 +57,13 @@ static float noise(float x, float y)
 float fbm_noise(float x, float y) 
 {
 	float ampl = 1.0;
-	float freq = 0.008;
+	float freq = 0.004;
 	float fin = 0.0;
 	float div = 0.0;
 	float lacun = 2.0;
 	float gain = 2.0;
 
-	for(int i = 0; i < OCTAVES; i++) {
+	for (int i = 0; i < OCTAVES; i++) {
 		fin += ampl * fabs(noise(x*freq, y*freq));
 		div += 256 * ampl;
 		x *= lacun; y *= lacun;

@@ -1,7 +1,7 @@
-struct shader_info {
+struct shader {
 	GLenum type;
 	const char *fpath;
-	GLuint shader;
+	GLuint program;
 };
 
 //  LoadShaders() takes an array of ShaderFile structures, each of which
@@ -14,4 +14,4 @@ struct shader_info {
 //
 //  loadShaders() returns the shader program value (as returned by
 //    glCreateProgram()) on success, or zero on failure. 
-GLuint load_shaders(struct shader_info *shaders);
+GLuint load_shaders(struct shader *shaders);

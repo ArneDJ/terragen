@@ -16,7 +16,8 @@
 int main(int argc, char *argv[])
 {
 	SDL_Init(SDL_INIT_VIDEO);
-	SDL_Window *window = SDL_CreateWindow("SDL2/OpenGL Demo", 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
+	SDL_Window *window = SDL_CreateWindow("SDL2/OpenGL Demo", 0, 0, 
+			WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
 
 	if (window == NULL) {
 		printf("error: could not create window: %s\n", SDL_GetError());
@@ -33,24 +34,24 @@ int main(int argc, char *argv[])
 	glEnable(GL_CULL_FACE);
 	glFrontFace(GL_CCW);
 
-	struct shader_info shaders[] = {
+	struct shader shaders[] = {
 		{GL_VERTEX_SHADER, "data/shader/cubev.glsl"},
 		{GL_FRAGMENT_SHADER, "data/shader/cubef.glsl"},
 		{GL_NONE, NULL}
 	};
-	struct shader_info skybox_info[] = {
+	struct shader skybox_info[] = {
 		{GL_VERTEX_SHADER, "data/shader/skyboxv.glsl"},
 		{GL_FRAGMENT_SHADER, "data/shader/skyboxf.glsl"},
 		{GL_NONE, NULL}
 	};
-	struct shader_info terrain_info[] = {
+	struct shader terrain_info[] = {
 		{GL_VERTEX_SHADER, "data/shader/terrainv.glsl"},
 		{GL_TESS_CONTROL_SHADER, "data/shader/terraintc.glsl"},
 		{GL_TESS_EVALUATION_SHADER, "data/shader/terrainte.glsl"},
 		{GL_FRAGMENT_SHADER, "data/shader/terrainf.glsl"},
 		{GL_NONE, NULL}
 	};
-	struct shader_info water_info[] = {
+	struct shader water_info[] = {
 		{GL_VERTEX_SHADER, "data/shader/waterv.glsl"},
 		{GL_TESS_CONTROL_SHADER, "data/shader/watertc.glsl"},
 		{GL_TESS_EVALUATION_SHADER, "data/shader/waterte.glsl"},
@@ -103,7 +104,7 @@ int main(int argc, char *argv[])
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 	SDL_Event event;
 	float start, end = 0.0;
-	while(event.type != SDL_QUIT) {
+	while (event.type != SDL_QUIT) {
 		start = (float)SDL_GetTicks() * 0.001;
 		float delta = start - end;
 		while(SDL_PollEvent(&event));
@@ -131,9 +132,9 @@ int main(int argc, char *argv[])
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_2D, stone_texture);
 		glBindVertexArray(plane.VAO);
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+//		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glDrawArrays(GL_PATCHES, 0, plane.vcount);
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+//		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		//
 		//
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -151,8 +152,8 @@ int main(int argc, char *argv[])
 		vec3 fcolor = {0.0, 0.0, 0.0};
 		vec3 p = {10.0, 10.0, 10.0};
 		vec3 d = {-5.0, -5.0, -5.0};
-		if(test_ray_AABB(cam.eye, cam.center, box)) {
-			if(keystates[SDL_SCANCODE_SPACE]) {
+		if (test_ray_AABB(cam.eye, cam.center, box)) {
+			if (keystates[SDL_SCANCODE_SPACE]) {
 				box.c = vec3_sum(cam.eye, cam.center);
 			}
 			fcolor.y = 0.5;

@@ -6,26 +6,25 @@
 
 static char *import(const char *filename);
 
-GLuint load_shaders(struct shader_info *shaders)
+GLuint load_shaders(struct shader *shaders)
 {
-	if(shaders == NULL)
+	if (shaders == NULL)
 		return 0;
 
  	GLuint program = glCreateProgram();
 
-	struct shader_info *entry = shaders;
-	while(entry->type != GL_NONE) {
+	struct shader *entry = shaders;
+	while (entry->type != GL_NONE) {
 		GLuint shader = glCreateShader(entry->type);
-		entry->shader = shader;
+		entry->program = shader;
 		char *source = import(entry->fpath);
 
 		//if no file was found or something worse
-		if(source == NULL) {
-			for(entry = shaders; entry->type != GL_NONE; entry++) {
-				glDeleteShader(entry->shader);
-				entry->shader = 0;
+		if (source == NULL) {
+			for (entry = shaders; entry->type != GL_NONE; entry++) {
+				glDeleteShader(entry->program);
+				entry->program = 0;
 			}
-
 			return 0;
 		}
 
@@ -37,7 +36,7 @@ GLuint load_shaders(struct shader_info *shaders)
 		glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
 
 		//if shader compilation failed print the error logs
-		if(!compiled) {
+		if (!compiled) {
 			GLsizei len;
 			glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
 		 	GLchar *log = calloc(len + 1, sizeof(GLchar));
@@ -45,7 +44,6 @@ GLuint load_shaders(struct shader_info *shaders)
 			printf("%s\n", log);
 		
 			free(log);
-			
 			return 0;
 		}
 		glAttachShader(program, shader);
@@ -56,7 +54,7 @@ GLuint load_shaders(struct shader_info *shaders)
 	GLint linked;
 	glGetProgramiv(program, GL_LINK_STATUS, &linked);
 
-	if(!linked) {
+	if (!linked) {
 		GLsizei len;
 		glGetProgramiv(program, GL_INFO_LOG_LENGTH, &len);
 
@@ -65,9 +63,9 @@ GLuint load_shaders(struct shader_info *shaders)
 		printf("%s\n", log);
 		free(log);
 		
-		for(entry = shaders; entry->type != GL_NONE; entry++) {
-			glDeleteShader(entry->shader);
-			entry->shader = 0;
+		for (entry = shaders; entry->type != GL_NONE; entry++) {
+			glDeleteShader(entry->program);
+			entry->program = 0;
 		}
 		return 0;
 	}
@@ -75,13 +73,12 @@ GLuint load_shaders(struct shader_info *shaders)
 	return program;
 }
 
-//imports the shaders from files
 static char *import(const char *filename)
 {
 	char *source;
 	FILE *file;
 
-	if(file = fopen(filename, "rb")){
+	if (file = fopen(filename, "rb")){
 		fseek(file, 0, SEEK_END);
 		const long int len = ftell(file);
 		rewind(file);

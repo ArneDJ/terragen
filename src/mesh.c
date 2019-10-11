@@ -65,8 +65,8 @@ struct mesh make_grid_mesh(int width, int length, float offset)
 
 	vec2 origin = {0.0, 0.0};
 	int n = 0;
-	for(int i = 0; i < width; i++) {
-		for(int j = 0; j < length; j++) {
+	for (int i = 0; i < width; i++) {
+		for (int j = 0; j < length; j++) {
 			v[n++] = make_plane_vertex(origin.x+offset, 0.0, origin.y+offset);
 			v[n++] = make_plane_vertex(origin.x+offset, 0.0, origin.y);
 			v[n++] = make_plane_vertex(origin.x, 0.0, origin.y);
@@ -114,7 +114,7 @@ struct mesh make_grid_mesh(int width, int length, float offset)
 void instance_mesh(struct mesh *m, int amount, vec3 *positions)
 {
 	mat4 *model = calloc(amount, sizeof(mat4));
-	for(int i = 0; i < amount; i++) {
+	for (int i = 0; i < amount; i++) {
 		model[i] = identity_matrix();
 		mat4_translate(&model[i], positions[i]);
 	}
@@ -125,7 +125,7 @@ void instance_mesh(struct mesh *m, int amount, vec3 *positions)
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
 	glBufferData(GL_ARRAY_BUFFER, amount * sizeof(mat4), &model[0], GL_STATIC_DRAW);
 
-	for(int i = 0; i < amount; i++) {
+	for (int i = 0; i < amount; i++) {
 		size_t len = sizeof(vec4);
 		glEnableVertexAttribArray(3);
 		glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * len, (void*)0);
