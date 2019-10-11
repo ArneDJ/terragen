@@ -5,6 +5,7 @@
 #include <GL/gl.h>
 #include "dds.h"
 #include "texture.h"
+#include "noise.h"
 
 GLuint load_dds_texture(const char *fpath) 
 {
@@ -80,6 +81,38 @@ GLuint load_dds_texture(const char *fpath)
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 	fclose(fp);
+	free(image);
+
+	return texnum;
+}
+
+GLuint make_heightmap_texture(void)
+{
+	GLuint texnum;
+	const size_t len = 1024 * 1024;
+	typedef unsigned char pixel[3];
+	pixel *image = calloc(len, sizeof(pixel));
+
+	int n = 0;
+	for(int y = 0; y < 1024; y++) {
+		for(int x = 0; x < 1024; x++) {
+			float z = fbm_noise(x, y);
+			if(z < 0.5)	
+				z = 0.0;
+			image[n][0] = 256 * z;
+			image[n][1] = 256 * z;
+			image[n][2] = 256 * z;
+			n++;
+		}
+	}
+
+	glGenTextures(1, &texnum);
+	glBindTexture(GL_TEXTURE_2D, texnum);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 1024, 1024);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1024, 1024, GL_RGB, GL_UNSIGNED_BYTE, image[0]);
+	//glTexImage2D(GL_TEXTURE_2D, 1, GL_RGB, 1024, 1024, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
 	free(image);
 
 	return texnum;

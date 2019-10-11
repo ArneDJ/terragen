@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
 
 	struct mesh cube = make_cube_mesh();
 	struct AABB box = {
-		{0.0, 0.0, 0.0},
+		{5.0, 5.0, 5.0},
 		{0.5, 0.5, 0.5},
 	};
 	struct sphere s = {
@@ -72,7 +72,8 @@ int main(int argc, char *argv[])
 		0.5
 	};
 
-	GLuint wood_texture = load_dds_texture("data/texture/wood.dds");
+	GLuint heightmap_generated = make_heightmap_texture();
+	GLuint wood_texture = load_dds_texture("data/texture/placeholder.dds");
 	GLuint heightmap_texture = load_dds_texture("data/texture/heightmap.dds");
 	GLuint grass_texture = load_dds_texture("data/texture/grass.dds");
 	GLuint stone_texture = load_dds_texture("data/texture/stone.dds");
@@ -84,9 +85,6 @@ int main(int argc, char *argv[])
 
 	mat4 model = IDENTITY_MATRIX;
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
-	glUseProgram(cube_program);
-	glUniformMatrix4fv(glGetUniformLocation(cube_program, "project"), 1, GL_FALSE, project.f);
-	glUniformMatrix4fv(glGetUniformLocation(cube_program, "model"), 1, GL_FALSE, model.f);
 	glUseProgram(skybox_program);
 	glUniformMatrix4fv(glGetUniformLocation(skybox_program, "project"), 1, GL_FALSE, project.f);
 	glUseProgram(terrain_program);
@@ -96,6 +94,11 @@ int main(int argc, char *argv[])
 	glUniformMatrix4fv(glGetUniformLocation(water_program, "project"), 1, GL_FALSE, project.f);
 	glUniformMatrix4fv(glGetUniformLocation(water_program, "model"), 1, GL_FALSE, model.f);
 
+	glUseProgram(cube_program);
+	glUniformMatrix4fv(glGetUniformLocation(cube_program, "project"), 1, GL_FALSE, project.f);
+	mat4_translate(&model, box.c);
+	glUniformMatrix4fv(glGetUniformLocation(cube_program, "model"), 1, GL_FALSE, model.f);
+
 	struct camera cam = init_camera(10.0, 5.0, 10.0, 90.0, 0.2);
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 	SDL_Event event;
@@ -104,6 +107,7 @@ int main(int argc, char *argv[])
 		start = (float)SDL_GetTicks() * 0.001;
 		float delta = start - end;
 		while(SDL_PollEvent(&event));
+		const Uint8 *keystates = SDL_GetKeyboardState(NULL);
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -119,7 +123,7 @@ int main(int argc, char *argv[])
 		glUniformMatrix4fv(glGetUniformLocation(terrain_program, "view"), 1, GL_FALSE, view.f);
 		glUniform1i(glGetUniformLocation(terrain_program, "heightmap"), 0);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, heightmap_texture);
+		glBindTexture(GL_TEXTURE_2D, heightmap_generated);
 		glUniform1i(glGetUniformLocation(terrain_program, "grass"), 1);
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, grass_texture);
@@ -137,12 +141,6 @@ int main(int argc, char *argv[])
 		glUniform1f(glGetUniformLocation(water_program, "time"), start);
 		glUniform3fv(glGetUniformLocation(water_program, "view_dir"), 1, cam.center.f);
 		glUniform3fv(glGetUniformLocation(water_program, "eye"), 1, cam.eye.f);
-		glUniform2f(glGetUniformLocation(water_program,  "gerstner_waves[0].direction"), 1.0f, 0.0f);
-		glUniform1f(glGetUniformLocation(water_program,  "gerstner_waves[0].amplitude"), 0.1);
-		glUniform1f(glGetUniformLocation(water_program,  "gerstner_waves[0].steepness"), 0.5);
-		glUniform1f(glGetUniformLocation(water_program,  "gerstner_waves[0].frequency"), 1.0);
-		glUniform1f(glGetUniformLocation(water_program,  "gerstner_waves[0].speed"),     1.0);
-		glUniform1ui(glGetUniformLocation(water_program, "gerstner_waves_length"),       2);
 		glUniformMatrix4fv(glGetUniformLocation(water_program, "view"), 1, GL_FALSE, view.f);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, water_n_texture);
@@ -150,15 +148,20 @@ int main(int argc, char *argv[])
 		glDrawArrays(GL_PATCHES, 0, plane.vcount);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-		vec3 fcolor = {1.0, 0.0, 0.0};
+		vec3 fcolor = {0.0, 0.0, 0.0};
 		vec3 p = {10.0, 10.0, 10.0};
 		vec3 d = {-5.0, -5.0, -5.0};
 		if(test_ray_AABB(cam.eye, cam.center, box)) {
+			if(keystates[SDL_SCANCODE_SPACE]) {
+				box.c = vec3_sum(cam.eye, cam.center);
+			}
 			fcolor.y = 0.5;
 		}
 
+		mat4_translate(&model, box.c);
 		glUseProgram(cube_program);
 		glUniform3fv(glGetUniformLocation(cube_program, "fcolor"), 1, fcolor.f);
+		glUniformMatrix4fv(glGetUniformLocation(cube_program, "model"), 1, GL_FALSE, model.f);
 		glUniformMatrix4fv(glGetUniformLocation(cube_program, "view"), 1, GL_FALSE, view.f);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, wood_texture);

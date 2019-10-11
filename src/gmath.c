@@ -11,6 +11,11 @@ static void swap(float *a, float *b)
 	*a = tmp;
 }
 
+float fract(float fraction)
+{
+	return fraction - floorf(fraction);
+}
+
 /* clamp n to lie within the range [min, max] */
 float clamp(float n, float min, float max)
 {

@@ -1,6 +1,7 @@
 #version 460 core
 #define PI 3.14159265
 
+uniform sampler2D heightmap;
 uniform sampler2D grass;
 uniform sampler2D stone;
 uniform vec3 view_dir;

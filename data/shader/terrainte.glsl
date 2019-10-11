@@ -3,7 +3,7 @@
 layout(triangles) in;
 uniform sampler2D heightmap;
 uniform mat4 model, view, project;
-uniform float amplitude = 8.0;
+uniform float amplitude = 2.0;
 
 out vec3 bump;
 out vec3 fpos;

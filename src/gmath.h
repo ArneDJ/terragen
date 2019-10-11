@@ -41,6 +41,8 @@ struct OBB {
 	vec3 e; // positive halfwidth extends of OBB along each axis
 };
 
+float fract(float fraction);
+
 vec3 vec3_make(float x, float y, float z);
 vec3 vec3_scale(float s, vec3 v);
 vec3 vec3_normalize(vec3 v);
