@@ -15,7 +15,7 @@ void main(void)
 			gl_TessCoord.z * gl_in[2].gl_Position);
 
 	vec3 wave_pos = gl_Position.xyz;
-	wave_pos.y = wave_pos.y + 0.95;
+	wave_pos.y = wave_pos.y + 4.55;
 	uv = wave_pos.xz;
 	fpos = wave_pos;
 	gl_Position = project * view * model * vec4(wave_pos, 1.0);

@@ -77,6 +77,7 @@ int main(int argc, char *argv[])
 	GLuint wood_texture = load_dds_texture("data/texture/placeholder.dds");
 	GLuint heightmap_texture = load_dds_texture("data/texture/heightmap.dds");
 	GLuint grass_texture = load_dds_texture("data/texture/grass.dds");
+	GLuint sand_texture = load_dds_texture("data/texture/sand.dds");
 	GLuint stone_texture = load_dds_texture("data/texture/stone.dds");
 	GLuint water_texture = load_dds_texture("data/texture/water.dds");
 	GLuint water_n_texture = load_dds_texture("data/texture/water_n.dds");
@@ -112,6 +113,10 @@ int main(int argc, char *argv[])
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		cam.speed = 1.0;
+		if (keystates[SDL_SCANCODE_LSHIFT]) {
+			cam.speed = 4.0;
+		}
 		update_camera(&cam, delta);
 		mat4 view = make_view_matrix(cam.eye, cam.center, cam.up);
 		mat4 skybox_view = view;
@@ -131,6 +136,9 @@ int main(int argc, char *argv[])
 		glUniform1i(glGetUniformLocation(terrain_program, "stone"), 2);
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_2D, stone_texture);
+		glUniform1i(glGetUniformLocation(terrain_program, "sand"), 3);
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, sand_texture);
 		glBindVertexArray(plane.VAO);
 //		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glDrawArrays(GL_PATCHES, 0, plane.vcount);

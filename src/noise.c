@@ -60,7 +60,7 @@ float fbm_noise(float x, float y)
 	float freq = 0.004;
 	float fin = 0.0;
 	float div = 0.0;
-	float lacun = 2.0;
+	float lacun = 2.5;
 	float gain = 2.0;
 
 	for (int i = 0; i < OCTAVES; i++) {

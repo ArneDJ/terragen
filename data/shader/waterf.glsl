@@ -4,7 +4,7 @@ uniform sampler2D water_normal;
 uniform vec3 view_dir;
 uniform vec3 eye;
 uniform vec3 sunDirection = {1.0, 1.0, 1.0};
-uniform vec3 sunColor = {1.0, 1.0, 1.0};
+uniform vec3 sunColor = {1.0, 0.6, 0.5};
 uniform vec3 waterColor = {0.0, 0.46, 0.74};
 
 in vec3 fpos;

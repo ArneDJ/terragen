@@ -9,6 +9,7 @@ uniform float amplitude = 8.0;
 out vec3 bump;
 out vec3 fpos;
 out vec2 uv;
+out float height;
 
 float random(in vec2 st) {
 	return fract(sin(dot(st.xy, vec2(1.9898,78.233)))*43758.5453123);
@@ -72,7 +73,7 @@ void main(void)
 			gl_TessCoord.z * gl_in[2].gl_Position);
 
 	uv = gl_Position.xz;
-	float height = texture(heightmap, uv * 0.015625).r;
+	height = texture(heightmap, uv * 0.015625).r;
 	bump = filter_normal(uv, 0.015625);
 	vec3 newpos = gl_Position.xyz;
 	newpos.y = amplitude * height;
