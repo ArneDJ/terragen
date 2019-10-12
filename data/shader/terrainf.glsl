@@ -3,6 +3,7 @@
 
 uniform sampler2D heightmap;
 uniform sampler2D grass;
+uniform sampler2D checker;
 uniform sampler2D stone;
 uniform sampler2D sand;
 uniform vec3 view_dir;
@@ -30,6 +31,7 @@ void main(void)
 	vec3 normal = vec3(0.0, 1.0, 0.0);
 	float exposure = max(dot(bump, sun_dir), 0.5);
 
+//	vec3 diffuse = texture(checker, uv * 0.5).xyz;
 	diffuse *= exposure;
 
 	gl_FragColor = vec4(diffuse, 1.0);

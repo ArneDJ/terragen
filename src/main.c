@@ -73,6 +73,7 @@ int main(int argc, char *argv[])
 		0.5
 	};
 
+	GLuint checker = load_dds_texture("data/texture/checker.dds");
 	GLuint heightmap_generated = make_heightmap_texture();
 	GLuint wood_texture = load_dds_texture("data/texture/placeholder.dds");
 	GLuint heightmap_texture = load_dds_texture("data/texture/heightmap.dds");
@@ -80,7 +81,7 @@ int main(int argc, char *argv[])
 	GLuint sand_texture = load_dds_texture("data/texture/sand.dds");
 	GLuint stone_texture = load_dds_texture("data/texture/stone.dds");
 	GLuint water_texture = load_dds_texture("data/texture/water.dds");
-	GLuint water_n_texture = load_dds_texture("data/texture/water_n.dds");
+	GLuint water_n_texture = load_dds_texture("data/texture/water_normal.dds");
 
 	struct mesh skybox = make_cube_mesh();
 	struct mesh plane = make_grid_mesh(64, 64, 1.0);
@@ -105,6 +106,8 @@ int main(int argc, char *argv[])
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 	SDL_Event event;
 	float start, end = 0.0;
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	while (event.type != SDL_QUIT) {
 		start = (float)SDL_GetTicks() * 0.001;
 		float delta = start - end;
@@ -145,17 +148,6 @@ int main(int argc, char *argv[])
 //		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		//
 		//
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glUseProgram(water_program);
-		glUniform1f(glGetUniformLocation(water_program, "time"), start);
-		glUniform3fv(glGetUniformLocation(water_program, "view_dir"), 1, cam.center.f);
-		glUniform3fv(glGetUniformLocation(water_program, "eye"), 1, cam.eye.f);
-		glUniformMatrix4fv(glGetUniformLocation(water_program, "view"), 1, GL_FALSE, view.f);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, water_n_texture);
-		glBindVertexArray(plane.VAO);
-		glDrawArrays(GL_PATCHES, 0, plane.vcount);
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 		vec3 fcolor = {0.0, 0.0, 0.0};
 		vec3 p = {10.0, 10.0, 10.0};
@@ -176,6 +168,23 @@ int main(int argc, char *argv[])
 		glBindTexture(GL_TEXTURE_2D, wood_texture);
 		glBindVertexArray(cube.VAO);
 		glDrawArrays(GL_TRIANGLES, 0, cube.vcount);
+
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glUseProgram(water_program);
+		glUniform1f(glGetUniformLocation(water_program, "time"), start);
+		glUniform3fv(glGetUniformLocation(water_program, "view_dir"), 1, cam.center.f);
+		glUniform3fv(glGetUniformLocation(water_program, "eye"), 1, cam.eye.f);
+		glUniformMatrix4fv(glGetUniformLocation(water_program, "view"), 1, GL_FALSE, view.f);
+		glUniform1i(glGetUniformLocation(water_program, "heightmap_terrain"), 0);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, heightmap_generated);
+		glUniform1i(glGetUniformLocation(water_program, "water_normal"), 1);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, water_n_texture);
+		glBindVertexArray(plane.VAO);
+		glDrawArrays(GL_PATCHES, 0, plane.vcount);
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+//		glDisable(GL_BLEND);
 
 		glUseProgram(skybox_program);
 		glUniformMatrix4fv(glGetUniformLocation(skybox_program, "view"), 1, GL_FALSE, skybox_view.f);

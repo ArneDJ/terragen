@@ -2,11 +2,13 @@
 
 layout(triangles) in;
 uniform mat4 model, view, project;
+uniform sampler2D terrain_height;
 uniform float time;
 
 out vec2 uv;
 out vec3 normal;
 out vec3 fpos;
+out float terrain_h;
 
 void main(void)
 {
@@ -18,6 +20,7 @@ void main(void)
 	wave_pos.y = wave_pos.y + 4.55;
 	uv = wave_pos.xz;
 	fpos = wave_pos;
+	terrain_h = texture(terrain_height, uv * 0.015625).r;
 	gl_Position = project * view * model * vec4(wave_pos, 1.0);
 }
 
