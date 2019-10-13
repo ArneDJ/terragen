@@ -77,6 +77,7 @@ void main(void)
 	bump = filter_normal(uv, 0.015625);
 	vec3 newpos = gl_Position.xyz;
 	newpos.y = amplitude * height;
+	fpos = newpos;
 	gl_Position = project * view * model * vec4(newpos, 1.0);
 }
 

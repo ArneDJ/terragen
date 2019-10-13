@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
 		glUseProgram(water_program);
 		glUniform1f(glGetUniformLocation(water_program, "time"), start);
 		glUniform3fv(glGetUniformLocation(water_program, "view_dir"), 1, cam.center.f);
-		glUniform3fv(glGetUniformLocation(water_program, "eye"), 1, cam.eye.f);
+		glUniform3fv(glGetUniformLocation(water_program, "view_eye"), 1, cam.eye.f);
 		glUniformMatrix4fv(glGetUniformLocation(water_program, "view"), 1, GL_FALSE, view.f);
 		glUniform1i(glGetUniformLocation(water_program, "heightmap_terrain"), 0);
 		glActiveTexture(GL_TEXTURE0);

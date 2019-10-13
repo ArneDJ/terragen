@@ -15,7 +15,7 @@ in vec3 bump;
 in vec2 uv;
 in float height;
 
-vec3 light_dir = vec3(1.0, 1.0, 1.0);
+const vec3 light_dir = vec3(1.0, 1.0, 1.0);
 
 float orenNayarDiffuse(vec3 lightDirection, vec3 viewDirection, vec3 surfaceNormal, float roughness, float albedo) 
 {
@@ -33,6 +33,15 @@ float orenNayarDiffuse(vec3 lightDirection, vec3 viewDirection, vec3 surfaceNorm
 	return albedo * max(0.0, NdotL) * (A + B * s / t) / PI;
 }
 
+float fog(vec3 fpos, vec3 view_pos)
+{
+	vec3 dist = vec3(distance(fpos.x, view_pos.x), distance(fpos.y, view_pos.y), distance(fpos.z, view_pos.z));
+	float z = length(dist);
+	float d = 0.03;
+	float fog_factor = exp(-(d*z)*(d*z));
+	return clamp(fog_factor, 0.0, 1.0);
+}
+
 void main(void)
 {
 	// The slope is one minus the y-component of the normal.
@@ -47,12 +56,17 @@ void main(void)
 
 	vec3 material = mix(grassf, snowf, smoothstep(0.7, 0.75, height));
 	material = mix(material, stonef, smoothstep(0.01, 0.04, slope));
-	material = mix(sandf, material, smoothstep(0.58, 0.61, height));
+	material = mix(sandf, material, smoothstep(0.58, 0.59, height));
 
 	vec3 view_dir = normalize(view_eye - fpos);
 
 	float diffuse = orenNayarDiffuse(light_dir, view_dir, bump, 0.5, 1.2);
 	material *= diffuse;
+
+	vec3 fog_color = {0.46, 0.7, 0.99};
+
+	float fogf = fog(fpos, view_eye);
+	material = mix(fog_color, material, fogf);
 
 	gl_FragColor = vec4(material, 1.0);
 }
