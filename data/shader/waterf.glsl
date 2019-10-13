@@ -36,6 +36,6 @@ void main(void)
 
 	float water_depth = 1.0 - terrain_h;
 	//water_depth = clamp(water_depth, 0.6, 1.0);
-	water_depth = smoothstep(0.3, 0.6, water_depth);
+	water_depth = smoothstep(0.3, 0.55, water_depth);
 	gl_FragColor = vec4((diffuse+specular+vec3(0.1))*waterColor, water_depth);
 }

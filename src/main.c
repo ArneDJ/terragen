@@ -82,6 +82,7 @@ int main(int argc, char *argv[])
 	GLuint stone_texture = load_dds_texture("data/texture/stone.dds");
 	GLuint water_texture = load_dds_texture("data/texture/water.dds");
 	GLuint water_n_texture = load_dds_texture("data/texture/water_normal.dds");
+	GLuint snow_texture = load_dds_texture("data/texture/snow.dds");
 
 	struct mesh skybox = make_cube_mesh();
 	struct mesh plane = make_grid_mesh(64, 64, 1.0);
@@ -128,8 +129,9 @@ int main(int argc, char *argv[])
 		skybox_view.f[14] = 0.0;
 
 		glUseProgram(terrain_program);
-		glUniform3fv(glGetUniformLocation(terrain_program, "view_dir"), 1, cam.center.f);
 		glUniformMatrix4fv(glGetUniformLocation(terrain_program, "view"), 1, GL_FALSE, view.f);
+		glUniform3fv(glGetUniformLocation(terrain_program, "view_center"), 1, cam.center.f);
+		glUniform3fv(glGetUniformLocation(terrain_program, "view_eye"), 1, cam.eye.f);
 		glUniform1i(glGetUniformLocation(terrain_program, "heightmap"), 0);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, heightmap_generated);
@@ -142,6 +144,9 @@ int main(int argc, char *argv[])
 		glUniform1i(glGetUniformLocation(terrain_program, "sand"), 3);
 		glActiveTexture(GL_TEXTURE3);
 		glBindTexture(GL_TEXTURE_2D, sand_texture);
+		glUniform1i(glGetUniformLocation(terrain_program, "snow"), 4);
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_2D, snow_texture);
 		glBindVertexArray(plane.VAO);
 //		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glDrawArrays(GL_PATCHES, 0, plane.vcount);
