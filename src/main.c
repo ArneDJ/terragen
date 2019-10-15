@@ -8,119 +8,228 @@
 #include "mesh.h"
 #include "camera.h"
 #include "texture.h"
-#include "display.h"
 
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 960
 
-int main(int argc, char *argv[])
+static SDL_Window *init_window(int width, int height);
+static SDL_GLContext init_glcontext(SDL_Window *window);
+
+struct object {
+	struct mesh m;
+	GLuint texture;
+	GLuint shader;
+	vec3 translation;
+	vec3 rotation;
+	vec3 scale;
+	struct AABB bbox;
+};
+
+struct terrain {
+	struct mesh m;
+	GLuint shader;
+	// collision surface
+	GLuint heightmap;
+	GLuint texture[5];
+};
+
+struct water {
+	struct mesh m;
+	GLuint shader;
+	GLuint diffuse;
+	GLuint normal;
+	GLuint depthmap;
+};
+
+struct object make_standard_object(void)
 {
-	SDL_Init(SDL_INIT_VIDEO);
-	SDL_Window *window = SDL_CreateWindow("SDL2/OpenGL Demo", 0, 0, 
-			WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
-
-	if (window == NULL) {
-		printf("error: could not create window: %s\n", SDL_GetError());
-		exit(EXIT_FAILURE);
-	}
-
-	SDL_GLContext glcontext = SDL_GL_CreateContext(window);
-	if (glewInit()) {
-		fprintf(stderr, "unable to init glew\n");
-		exit(EXIT_FAILURE);
-	}
-	glClearColor(0,0,0,1);
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-	glFrontFace(GL_CCW);
-
-	struct shader shaders[] = {
+	struct object obj;
+	struct shader pipeline[] = {
 		{GL_VERTEX_SHADER, "data/shader/cubev.glsl"},
 		{GL_FRAGMENT_SHADER, "data/shader/cubef.glsl"},
 		{GL_NONE, NULL}
 	};
-	struct shader skybox_info[] = {
-		{GL_VERTEX_SHADER, "data/shader/skyboxv.glsl"},
-		{GL_FRAGMENT_SHADER, "data/shader/skyboxf.glsl"},
-		{GL_NONE, NULL}
-	};
-	struct shader terrain_info[] = {
-		{GL_VERTEX_SHADER, "data/shader/terrainv.glsl"},
-		{GL_TESS_CONTROL_SHADER, "data/shader/terraintc.glsl"},
-		{GL_TESS_EVALUATION_SHADER, "data/shader/terrainte.glsl"},
-		{GL_FRAGMENT_SHADER, "data/shader/terrainf.glsl"},
-		{GL_NONE, NULL}
-	};
-	struct shader water_info[] = {
+
+	obj.shader = load_shaders(pipeline);
+	obj.m = make_cube_mesh();
+	vec3 center = {5.0, 5.0, 5.0};
+	obj.bbox.c = center;
+	obj.bbox.r[0] = 0.5;
+	obj.bbox.r[1] = 0.5;
+	obj.bbox.r[2] = 0.5;
+
+	obj.texture = load_dds_texture("data/texture/placeholder.dds");
+
+	mat4 model = IDENTITY_MATRIX;
+	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
+	glUseProgram(obj.shader);
+	glUniformMatrix4fv(glGetUniformLocation(obj.shader, "project"), 1, GL_FALSE, project.f);
+	mat4_translate(&model, obj.bbox.c);
+	glUniformMatrix4fv(glGetUniformLocation(obj.shader, "model"), 1, GL_FALSE, model.f);
+
+	return obj;
+}
+
+struct water make_water(void)
+{
+	struct water wat;
+	struct shader pipeline[] = {
 		{GL_VERTEX_SHADER, "data/shader/waterv.glsl"},
 		{GL_TESS_CONTROL_SHADER, "data/shader/watertc.glsl"},
 		{GL_TESS_EVALUATION_SHADER, "data/shader/waterte.glsl"},
 		{GL_FRAGMENT_SHADER, "data/shader/waterf.glsl"},
 		{GL_NONE, NULL}
 	};
-	GLuint cube_program = load_shaders(shaders);
-	GLuint skybox_program = load_shaders(skybox_info);
-	GLuint terrain_program = load_shaders(terrain_info);
-	GLuint water_program = load_shaders(water_info);
+	wat.shader = load_shaders(pipeline);
+	wat.m = make_grid_mesh(64, 64, 1.0);
+	
+	wat.normal = load_dds_texture("data/texture/water_normal.dds");
 
-	struct mesh cube = make_cube_mesh();
-	struct AABB box = {
-		{5.0, 5.0, 5.0},
-		{0.5, 0.5, 0.5},
+	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
+	glUseProgram(wat.shader);
+	glUniformMatrix4fv(glGetUniformLocation(wat.shader, "project"), 1, GL_FALSE, project.f);
+
+	return wat;
+}
+
+void display_water(struct water *wat)
+{
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glUseProgram(wat->shader);
+	glUniform1i(glGetUniformLocation(wat->shader, "heightmap_terrain"), 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, wat->depthmap);
+	glUniform1i(glGetUniformLocation(wat->shader, "water_normal"), 1);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, wat->normal);
+	glBindVertexArray(wat->m.VAO);
+	glDrawArrays(GL_PATCHES, 0, wat->m.vcount);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+}
+
+struct object make_skybox(void)
+{
+	struct object skybox = {0};
+	struct shader pipeline[] = {
+		{GL_VERTEX_SHADER, "data/shader/skyboxv.glsl"},
+		{GL_FRAGMENT_SHADER, "data/shader/skyboxf.glsl"},
+		{GL_NONE, NULL}
 	};
-	struct sphere s = {
-		{0.0, 0.0, 0.0},
-		0.5
-	};
 
-	GLuint checker = load_dds_texture("data/texture/checker.dds");
-	GLuint heightmap_generated = make_heightmap_texture();
-	GLuint wood_texture = load_dds_texture("data/texture/placeholder.dds");
-	GLuint heightmap_texture = load_dds_texture("data/texture/heightmap.dds");
-	GLuint grass_texture = load_dds_texture("data/texture/grass.dds");
-	GLuint sand_texture = load_dds_texture("data/texture/sand.dds");
-	GLuint stone_texture = load_dds_texture("data/texture/stone.dds");
-	GLuint water_texture = load_dds_texture("data/texture/water.dds");
-	GLuint water_n_texture = load_dds_texture("data/texture/water_normal.dds");
-	GLuint snow_texture = load_dds_texture("data/texture/snow.dds");
-
-	struct mesh skybox = make_cube_mesh();
-	struct mesh plane = make_grid_mesh(64, 64, 1.0);
-
+	skybox.shader = load_shaders(pipeline);
 	mat4 model = IDENTITY_MATRIX;
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
-	glUseProgram(skybox_program);
-	glUniformMatrix4fv(glGetUniformLocation(skybox_program, "project"), 1, GL_FALSE, project.f);
-	glUseProgram(terrain_program);
-	glUniformMatrix4fv(glGetUniformLocation(terrain_program, "project"), 1, GL_FALSE, project.f);
-	glUniformMatrix4fv(glGetUniformLocation(terrain_program, "model"), 1, GL_FALSE, model.f);
-	glUseProgram(water_program);
-	glUniformMatrix4fv(glGetUniformLocation(water_program, "project"), 1, GL_FALSE, project.f);
-	glUniformMatrix4fv(glGetUniformLocation(water_program, "model"), 1, GL_FALSE, model.f);
+	glUseProgram(skybox.shader);
+	glUniformMatrix4fv(glGetUniformLocation(skybox.shader, "project"), 1, GL_FALSE, project.f);
 
-	glUseProgram(cube_program);
-	glUniformMatrix4fv(glGetUniformLocation(cube_program, "project"), 1, GL_FALSE, project.f);
-	mat4_translate(&model, box.c);
-	glUniformMatrix4fv(glGetUniformLocation(cube_program, "model"), 1, GL_FALSE, model.f);
+	skybox.m = make_cube_mesh();
+
+	return skybox;
+}
+
+void display_skybox(struct object *sky)
+{
+	glUseProgram(sky->shader);
+	glDisable(GL_CULL_FACE);
+	glDepthFunc(GL_LEQUAL);
+
+	glBindVertexArray(sky->m.VAO);
+	glDrawArrays(GL_TRIANGLES, 0, sky->m.vcount);
+
+	glDepthFunc(GL_LESS);
+	glEnable(GL_CULL_FACE);
+}
+
+void display_static_object(struct object *obj)
+{
+	glUseProgram(obj->shader);
+	mat4 model = IDENTITY_MATRIX;
+	mat4_translate(&model, obj->translation);
+
+	glBindVertexArray(obj->m.VAO);
+	glDrawArrays(GL_TRIANGLES, 0, obj->m.vcount);
+}
+
+struct terrain make_terrain(void)
+{
+	struct terrain ter = {0};
+
+	struct shader pipeline[] = {
+		{GL_VERTEX_SHADER, "data/shader/terrainv.glsl"},
+		{GL_TESS_CONTROL_SHADER, "data/shader/terraintc.glsl"},
+		{GL_TESS_EVALUATION_SHADER, "data/shader/terrainte.glsl"},
+		{GL_FRAGMENT_SHADER, "data/shader/terrainf.glsl"},
+		{GL_NONE, NULL}
+	};
+	ter.shader = load_shaders(pipeline);
+	ter.m = make_grid_mesh(64, 64, 1.0);
+
+	ter.heightmap = make_heightmap_texture();
+	ter.texture[0] = load_dds_texture("data/texture/grass.dds");
+	ter.texture[1] = load_dds_texture("data/texture/stone.dds");
+	ter.texture[2] = load_dds_texture("data/texture/sand.dds");
+	ter.texture[3] = load_dds_texture("data/texture/snow.dds");
+
+	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
+	glUseProgram(ter.shader);
+	glUniformMatrix4fv(glGetUniformLocation(ter.shader, "project"), 1, GL_FALSE, project.f);
+
+	return ter;
+}
+
+void display_terrain(struct terrain *ter)
+{
+	glUseProgram(ter->shader);
+
+	glUniform1i(glGetUniformLocation(ter->shader, "grass"), 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, ter->texture[0]);
+
+	glUniform1i(glGetUniformLocation(ter->shader, "stone"), 1);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, ter->texture[1]);
+
+	glUniform1i(glGetUniformLocation(ter->shader, "sand"), 2);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, ter->texture[2]);
+
+	glUniform1i(glGetUniformLocation(ter->shader, "snow"), 3);
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, ter->texture[3]);
+
+	glUniform1i(glGetUniformLocation(ter->shader, "heightmap"), 4);
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, ter->heightmap);
+
+	glBindVertexArray(ter->m.VAO);
+//	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glDrawArrays(GL_PATCHES, 0, ter->m.vcount);
+//	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+}
+
+void run_game(SDL_Window *window)
+{
+	struct object skybox = make_skybox();
+	struct terrain terrain = make_terrain();
+	struct water water = make_water();
+	struct object box = make_standard_object();
+	water.depthmap = terrain.heightmap;
 
 	struct camera cam = init_camera(10.0, 5.0, 10.0, 90.0, 0.2);
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 	SDL_Event event;
 	float start, end = 0.0;
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	while (event.type != SDL_QUIT) {
 		start = (float)SDL_GetTicks() * 0.001;
 		float delta = start - end;
+
 		while(SDL_PollEvent(&event));
 		const Uint8 *keystates = SDL_GetKeyboardState(NULL);
-
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 		cam.speed = 1.0;
 		if (keystates[SDL_SCANCODE_LSHIFT]) {
 			cam.speed = 4.0;
 		}
+
 		update_camera(&cam, delta);
 		mat4 view = make_view_matrix(cam.eye, cam.center, cam.up);
 		mat4 skybox_view = view;
@@ -128,80 +237,101 @@ int main(int argc, char *argv[])
 		skybox_view.f[13] = 0.0;
 		skybox_view.f[14] = 0.0;
 
-		glUseProgram(terrain_program);
-		glUniformMatrix4fv(glGetUniformLocation(terrain_program, "view"), 1, GL_FALSE, view.f);
-		glUniform3fv(glGetUniformLocation(terrain_program, "view_center"), 1, cam.center.f);
-		glUniform3fv(glGetUniformLocation(terrain_program, "view_eye"), 1, cam.eye.f);
-		glUniform1i(glGetUniformLocation(terrain_program, "heightmap"), 0);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, heightmap_generated);
-		glUniform1i(glGetUniformLocation(terrain_program, "grass"), 1);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, grass_texture);
-		glUniform1i(glGetUniformLocation(terrain_program, "stone"), 2);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, stone_texture);
-		glUniform1i(glGetUniformLocation(terrain_program, "sand"), 3);
-		glActiveTexture(GL_TEXTURE3);
-		glBindTexture(GL_TEXTURE_2D, sand_texture);
-		glUniform1i(glGetUniformLocation(terrain_program, "snow"), 4);
-		glActiveTexture(GL_TEXTURE4);
-		glBindTexture(GL_TEXTURE_2D, snow_texture);
-		glBindVertexArray(plane.VAO);
-//		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glDrawArrays(GL_PATCHES, 0, plane.vcount);
-//		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-		//
-		//
-
 		vec3 fcolor = {0.0, 0.0, 0.0};
-		vec3 p = {10.0, 10.0, 10.0};
-		vec3 d = {-5.0, -5.0, -5.0};
-		if (test_ray_AABB(cam.eye, cam.center, box)) {
+		if (test_ray_AABB(cam.eye, cam.center, box.bbox)) {
 			if (keystates[SDL_SCANCODE_SPACE]) {
-				box.c = vec3_sum(cam.eye, cam.center);
+				box.bbox.c = vec3_sum(cam.eye, cam.center);
 			}
 			fcolor.y = 0.5;
 		}
 
-		mat4_translate(&model, box.c);
-		glUseProgram(cube_program);
-		glUniform3fv(glGetUniformLocation(cube_program, "fcolor"), 1, fcolor.f);
-		glUniformMatrix4fv(glGetUniformLocation(cube_program, "model"), 1, GL_FALSE, model.f);
-		glUniformMatrix4fv(glGetUniformLocation(cube_program, "view"), 1, GL_FALSE, view.f);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, wood_texture);
-		glBindVertexArray(cube.VAO);
-		glDrawArrays(GL_TRIANGLES, 0, cube.vcount);
+		glUseProgram(terrain.shader);
+		glUniformMatrix4fv(glGetUniformLocation(terrain.shader, "view"), 1, GL_FALSE, view.f);
+		glUseProgram(water.shader);
+		glUniformMatrix4fv(glGetUniformLocation(water.shader, "view"), 1, GL_FALSE, view.f);
+		glUseProgram(box.shader);
+		glUniformMatrix4fv(glGetUniformLocation(box.shader, "view"), 1, GL_FALSE, view.f);
 
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glUseProgram(water_program);
-		glUniform1f(glGetUniformLocation(water_program, "time"), start);
-		glUniform3fv(glGetUniformLocation(water_program, "view_dir"), 1, cam.center.f);
-		glUniform3fv(glGetUniformLocation(water_program, "view_eye"), 1, cam.eye.f);
-		glUniformMatrix4fv(glGetUniformLocation(water_program, "view"), 1, GL_FALSE, view.f);
-		glUniform1i(glGetUniformLocation(water_program, "heightmap_terrain"), 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(terrain.shader);
+		glUniform3fv(glGetUniformLocation(terrain.shader, "view_center"), 1, cam.center.f);
+		glUniform3fv(glGetUniformLocation(terrain.shader, "view_eye"), 1, cam.eye.f);
+		display_terrain(&terrain);
+
+		mat4 model = IDENTITY_MATRIX;
+		mat4_translate(&model, box.bbox.c);
+		glUseProgram(box.shader);
+		glUniform3fv(glGetUniformLocation(box.shader, "fcolor"), 1, fcolor.f);
+		glUniformMatrix4fv(glGetUniformLocation(box.shader, "model"), 1, GL_FALSE, model.f);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, heightmap_generated);
-		glUniform1i(glGetUniformLocation(water_program, "water_normal"), 1);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, water_n_texture);
-		glBindVertexArray(plane.VAO);
-		glDrawArrays(GL_PATCHES, 0, plane.vcount);
-		//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		glBindTexture(GL_TEXTURE_2D, box.texture);
+		glBindVertexArray(box.m.VAO);
+		glDrawArrays(GL_TRIANGLES, 0, box.m.vcount);
+
+		glUseProgram(water.shader);
+		glUniform1f(glGetUniformLocation(water.shader, "time"), start);
+		glUniform3fv(glGetUniformLocation(water.shader, "view_dir"), 1, cam.center.f);
+		glUniform3fv(glGetUniformLocation(water.shader, "view_eye"), 1, cam.eye.f);
+		display_water(&water);
+
 //		glDisable(GL_BLEND);
 
-		glUseProgram(skybox_program);
-		glUniformMatrix4fv(glGetUniformLocation(skybox_program, "view"), 1, GL_FALSE, skybox_view.f);
-		display_skybox(skybox);
+		glUseProgram(skybox.shader);
+		glUniformMatrix4fv(glGetUniformLocation(skybox.shader, "view"), 1, GL_FALSE, skybox_view.f);
+		display_skybox(&skybox);
 
 		SDL_GL_SwapWindow(window);
 		end = start;
 	}
+}
+
+int main(int argc, char *argv[])
+{
+	SDL_Window *window = init_window(WINDOW_WIDTH, WINDOW_HEIGHT);
+	SDL_GLContext glcontext = init_glcontext(window);
+
+	run_game(window);
 
 	SDL_GL_DeleteContext(glcontext);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 
 	exit(EXIT_SUCCESS);
+}
+
+static SDL_Window *init_window(int width, int height)
+{
+	SDL_Window *window;
+
+	SDL_Init(SDL_INIT_VIDEO);
+	window = SDL_CreateWindow("Terragen", 0, 0, 
+			WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
+
+	if (window == NULL) {
+		printf("error: could not create window: %s\n", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+
+	return window;
+}
+
+static SDL_GLContext init_glcontext(SDL_Window *window)
+{
+	SDL_GLContext glcontext = SDL_GL_CreateContext(window);
+
+	if (glewInit()) {
+		fprintf(stderr, "unable to init glew\n");
+		exit(EXIT_FAILURE);
+	}
+
+	glClearColor(0,0,0,1);
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glFrontFace(GL_CCW);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	return glcontext;
 }

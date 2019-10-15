@@ -3,7 +3,7 @@
 
 layout(triangles) in;
 uniform sampler2D heightmap;
-uniform mat4 model, view, project;
+uniform mat4 view, project;
 uniform float amplitude = 8.0;
 
 out vec3 bump;
@@ -78,6 +78,6 @@ void main(void)
 	vec3 newpos = gl_Position.xyz;
 	newpos.y = amplitude * height;
 	fpos = newpos;
-	gl_Position = project * view * model * vec4(newpos, 1.0);
+	gl_Position = project * view * vec4(newpos, 1.0);
 }
 

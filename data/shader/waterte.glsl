@@ -1,7 +1,7 @@
 #version 460 core
 
 layout(triangles) in;
-uniform mat4 model, view, project;
+uniform mat4 view, project;
 uniform sampler2D terrain_height;
 uniform float time;
 
@@ -21,6 +21,6 @@ void main(void)
 	uv = wave_pos.xz;
 	fpos = wave_pos;
 	terrain_h = texture(terrain_height, uv * 0.015625).r;
-	gl_Position = project * view * model * vec4(wave_pos, 1.0);
+	gl_Position = project * view * vec4(wave_pos, 1.0);
 }
 
