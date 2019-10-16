@@ -14,7 +14,7 @@
 
 static SDL_Window *init_window(int width, int height);
 static SDL_GLContext init_glcontext(SDL_Window *window);
-
+	
 struct object {
 	struct mesh m;
 	GLuint texture;
@@ -40,6 +40,23 @@ struct water {
 	GLuint normal;
 	GLuint depthmap;
 };
+
+struct scene {
+	struct terrain terrain;
+	struct water water;
+	struct object skybox;
+	struct object object;
+	GLuint heightmap;
+};
+
+struct context {
+	struct scene scene;
+	struct camera camera;
+	float delta;
+};
+
+vec3 fcolor;
+float gtime;
 
 struct object make_standard_object(void)
 {
@@ -70,7 +87,21 @@ struct object make_standard_object(void)
 	return obj;
 }
 
-struct water make_water(void)
+void display_standard_object(struct object *obj)
+{
+	mat4 model = IDENTITY_MATRIX;
+	mat4_translate(&model, obj->bbox.c);
+
+	glUseProgram(obj->shader);
+	glUniform3fv(glGetUniformLocation(obj->shader, "fcolor"), 1, fcolor.f);
+	glUniformMatrix4fv(glGetUniformLocation(obj->shader, "model"), 1, GL_FALSE, model.f);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, obj->texture);
+	glBindVertexArray(obj->m.VAO);
+	glDrawArrays(GL_TRIANGLES, 0, obj->m.vcount);
+}
+
+struct water make_water(GLuint depthmap)
 {
 	struct water wat;
 	struct shader pipeline[] = {
@@ -82,6 +113,7 @@ struct water make_water(void)
 	};
 	wat.shader = load_shaders(pipeline);
 	wat.m = make_grid_mesh(64, 64, 1.0);
+	wat.depthmap = depthmap;
 	
 	wat.normal = load_dds_texture("data/texture/water_normal.dds");
 
@@ -150,7 +182,7 @@ void display_static_object(struct object *obj)
 	glDrawArrays(GL_TRIANGLES, 0, obj->m.vcount);
 }
 
-struct terrain make_terrain(void)
+struct terrain make_terrain(GLuint heightmap)
 {
 	struct terrain ter = {0};
 
@@ -164,7 +196,7 @@ struct terrain make_terrain(void)
 	ter.shader = load_shaders(pipeline);
 	ter.m = make_grid_mesh(64, 64, 1.0);
 
-	ter.heightmap = make_heightmap_texture();
+	ter.heightmap = heightmap;
 	ter.texture[0] = load_dds_texture("data/texture/grass.dds");
 	ter.texture[1] = load_dds_texture("data/texture/stone.dds");
 	ter.texture[2] = load_dds_texture("data/texture/sand.dds");
@@ -207,97 +239,89 @@ void display_terrain(struct terrain *ter)
 //	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
+void display_scene(struct scene *scene)
+{
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	display_terrain(&scene->terrain);
+	display_standard_object(&scene->object);
+	display_water(&scene->water);
+	display_skybox(&scene->skybox);
+}
+
+void load_scene(struct scene *scene)
+{
+	scene->heightmap = make_heightmap_texture();
+
+	scene->skybox = make_skybox();
+	scene->terrain = make_terrain(scene->heightmap);
+	scene->water = make_water(scene->heightmap);
+	scene->object = make_standard_object();
+}
+
+void update_context(struct context *context)
+{
+	const Uint8 *keystates = SDL_GetKeyboardState(NULL);
+	context->camera.speed = 1.0;
+	if (keystates[SDL_SCANCODE_LSHIFT]) {
+		context->camera.speed = 4.0;
+	}
+
+	update_camera(&context->camera, context->delta);
+	mat4 view = make_view_matrix(context->camera.eye, context->camera.center, context->camera.up);
+	mat4 skybox_view = view;
+	skybox_view.f[12] = 0.0;
+	skybox_view.f[13] = 0.0;
+	skybox_view.f[14] = 0.0;
+
+	fcolor.x = 0.0;
+	fcolor.y = 0.0;
+	fcolor.z = 0.0;
+	if (test_ray_AABB(context->camera.eye, context->camera.center, context->scene.object.bbox)) {
+		if (keystates[SDL_SCANCODE_SPACE]) {
+			context->scene.object.bbox.c = vec3_sum(context->camera.eye, context->camera.center);
+		}
+		fcolor.y = 0.5;
+	}
+
+	glUseProgram(context->scene.terrain.shader);
+	glUniformMatrix4fv(glGetUniformLocation(context->scene.terrain.shader, "view"), 1, GL_FALSE, view.f);
+	glUniform3fv(glGetUniformLocation(context->scene.terrain.shader, "view_center"), 1, context->camera.center.f);
+	glUniform3fv(glGetUniformLocation(context->scene.terrain.shader, "view_eye"), 1, context->camera.eye.f);
+	glUseProgram(context->scene.water.shader);
+	glUniformMatrix4fv(glGetUniformLocation(context->scene.water.shader, "view"), 1, GL_FALSE, view.f);
+	glUniform3fv(glGetUniformLocation(context->scene.water.shader, "view_dir"), 1, context->camera.center.f);
+	glUniform3fv(glGetUniformLocation(context->scene.water.shader, "view_eye"), 1, context->camera.eye.f);
+	glUniform1f(glGetUniformLocation(context->scene.water.shader, "time"), gtime);
+	glUseProgram(context->scene.object.shader);
+	glUniformMatrix4fv(glGetUniformLocation(context->scene.object.shader, "view"), 1, GL_FALSE, view.f);
+	glUseProgram(context->scene.skybox.shader);
+	glUniformMatrix4fv(glGetUniformLocation(context->scene.skybox.shader, "view"), 1, GL_FALSE, skybox_view.f);
+}
+
 void run_game(SDL_Window *window)
 {
-	struct object skybox = make_skybox();
-	struct terrain terrain = make_terrain();
-	struct water water = make_water();
-	struct object box = make_standard_object();
-	water.depthmap = terrain.heightmap;
+	struct context context;
+	load_scene(&context.scene);
+	context.camera = init_camera(10.0, 5.0, 10.0, 90.0, 0.2);
+	float start, end = 0.0;
 
-	struct camera cam = init_camera(10.0, 5.0, 10.0, 90.0, 0.2);
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 	SDL_Event event;
-	float start, end = 0.0;
 	while (event.type != SDL_QUIT) {
-		start = (float)SDL_GetTicks() * 0.001;
+		gtime = (float)SDL_GetTicks();
+		start = gtime * 0.001;
 		float delta = start - end;
+		context.delta = delta;
 
 		while(SDL_PollEvent(&event));
-		const Uint8 *keystates = SDL_GetKeyboardState(NULL);
-		cam.speed = 1.0;
-		if (keystates[SDL_SCANCODE_LSHIFT]) {
-			cam.speed = 4.0;
-		}
 
-		update_camera(&cam, delta);
-		mat4 view = make_view_matrix(cam.eye, cam.center, cam.up);
-		mat4 skybox_view = view;
-		skybox_view.f[12] = 0.0;
-		skybox_view.f[13] = 0.0;
-		skybox_view.f[14] = 0.0;
-
-		vec3 fcolor = {0.0, 0.0, 0.0};
-		if (test_ray_AABB(cam.eye, cam.center, box.bbox)) {
-			if (keystates[SDL_SCANCODE_SPACE]) {
-				box.bbox.c = vec3_sum(cam.eye, cam.center);
-			}
-			fcolor.y = 0.5;
-		}
-
-		glUseProgram(terrain.shader);
-		glUniformMatrix4fv(glGetUniformLocation(terrain.shader, "view"), 1, GL_FALSE, view.f);
-		glUseProgram(water.shader);
-		glUniformMatrix4fv(glGetUniformLocation(water.shader, "view"), 1, GL_FALSE, view.f);
-		glUseProgram(box.shader);
-		glUniformMatrix4fv(glGetUniformLocation(box.shader, "view"), 1, GL_FALSE, view.f);
-
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		glUseProgram(terrain.shader);
-		glUniform3fv(glGetUniformLocation(terrain.shader, "view_center"), 1, cam.center.f);
-		glUniform3fv(glGetUniformLocation(terrain.shader, "view_eye"), 1, cam.eye.f);
-		display_terrain(&terrain);
-
-		mat4 model = IDENTITY_MATRIX;
-		mat4_translate(&model, box.bbox.c);
-		glUseProgram(box.shader);
-		glUniform3fv(glGetUniformLocation(box.shader, "fcolor"), 1, fcolor.f);
-		glUniformMatrix4fv(glGetUniformLocation(box.shader, "model"), 1, GL_FALSE, model.f);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, box.texture);
-		glBindVertexArray(box.m.VAO);
-		glDrawArrays(GL_TRIANGLES, 0, box.m.vcount);
-
-		glUseProgram(water.shader);
-		glUniform1f(glGetUniformLocation(water.shader, "time"), start);
-		glUniform3fv(glGetUniformLocation(water.shader, "view_dir"), 1, cam.center.f);
-		glUniform3fv(glGetUniformLocation(water.shader, "view_eye"), 1, cam.eye.f);
-		display_water(&water);
-
-//		glDisable(GL_BLEND);
-
-		glUseProgram(skybox.shader);
-		glUniformMatrix4fv(glGetUniformLocation(skybox.shader, "view"), 1, GL_FALSE, skybox_view.f);
-		display_skybox(&skybox);
+		update_context(&context);
+		display_scene(&context.scene);
 
 		SDL_GL_SwapWindow(window);
 		end = start;
 	}
-}
-
-int main(int argc, char *argv[])
-{
-	SDL_Window *window = init_window(WINDOW_WIDTH, WINDOW_HEIGHT);
-	SDL_GLContext glcontext = init_glcontext(window);
-
-	run_game(window);
-
-	SDL_GL_DeleteContext(glcontext);
-	SDL_DestroyWindow(window);
-	SDL_Quit();
-
-	exit(EXIT_SUCCESS);
 }
 
 static SDL_Window *init_window(int width, int height)
@@ -335,3 +359,18 @@ static SDL_GLContext init_glcontext(SDL_Window *window)
 
 	return glcontext;
 }
+
+int main(int argc, char *argv[])
+{
+	SDL_Window *window = init_window(WINDOW_WIDTH, WINDOW_HEIGHT);
+	SDL_GLContext glcontext = init_glcontext(window);
+
+	run_game(window);
+
+	SDL_GL_DeleteContext(glcontext);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
+
+	exit(EXIT_SUCCESS);
+}
+
