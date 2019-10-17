@@ -78,6 +78,7 @@ void main(void)
 	vec3 newpos = gl_Position.xyz;
 	newpos.y = amplitude * height;
 	fpos = newpos;
+	//gl_Position.y *= amplitude;
 	gl_Position = project * view * vec4(newpos, 1.0);
 }
 

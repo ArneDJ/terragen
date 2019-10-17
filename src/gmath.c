@@ -251,6 +251,40 @@ int test_ray_triangle(vec3 p, vec3 q, vec3 a, vec3 b, vec3 c)
 	return 1;
 }
 
+/* DEPRECATED
+int test_ray_triangle(vec3 p, vec3 q, vec3 a, vec3 b, vec3 c)
+{
+	vec3 v0v1 = vec3_sub(b, a);
+	vec3 v0v2 = vec3_sub(c, a);
+
+	vec3 pvec = vec3_cross(q, v0v2);
+
+	float det = vec3_dot(v0v1, pvec);
+
+	if (det < 0.000001)
+		return 0;
+
+	float invDet = 1.0 / det;
+
+	vec3 tvec = vec3_sub(p, a);
+
+	float u = vec3_dot(tvec, pvec) * invDet;
+
+	if (u < 0 || u > 1)
+		return 0;
+
+	vec3 qvec = vec3_cross(tvec, v0v1);
+
+	float v = vec3_dot(q, qvec) * invDet;
+
+	if (v < 0 || u + v > 1)
+		return 0;
+
+	return 1;
+}
+*/
+
+/* DEPRECATED
 vec3 barycentric_ray_triangle(vec3 p, vec3 q, vec3 a, vec3 b, vec3 c)
 {
 	vec3 tmp;
@@ -275,22 +309,20 @@ vec3 barycentric_ray_triangle(vec3 p, vec3 q, vec3 a, vec3 b, vec3 c)
 
 	return tmp;
 }
+*/
 
+/* DEPRECATED 
 vec3 barycentric_to_cartesian(vec3 bar, vec3 a, vec3 b, vec3 c)
 {
 	vec3 tmp;
 
-	vec3 ca = vec3_sub(a, c);
-	vec3 cb = vec3_sub(b, c);
-
-	ca = vec3_scale(bar.x, ca);
-	cb = vec3_scale(bar.y, cb);
-
-	tmp = vec3_sum(c, ca);
-	tmp = vec3_sum(tmp, cb);
+	tmp.x = bar.x * a.x + bar.y * b.x + bar.z * c.x;
+	tmp.y = bar.x * a.y + bar.y * b.y + bar.z * c.y;
+	tmp.z = bar.x * a.z + bar.y * b.z + bar.z * c.z;
 
 	return tmp;
 }
+*/
 
 mat4 make_project_matrix(int fov, float aspect, float near, float far)
 {
@@ -343,4 +375,44 @@ mat4 identity_matrix(void)
 {
 	mat4 tmp = IDENTITY_MATRIX;
 	return tmp;
+}
+
+int ray_intersects_triangle(vec3 rayOrigin, vec3 rayVector, struct triangle *tri, vec3 *out, float *dist)
+{
+	const float EPSILON = 0.0000001;
+	vec3 vertex0 = tri->a;
+	vec3 vertex1 = tri->b;
+	vec3 vertex2 = tri->c;
+	vec3 edge1, edge2, h, s, q;
+	float a,f,u,v;
+	edge1 = vec3_sub(vertex1, vertex0);
+	edge2 = vec3_sub(vertex2, vertex0);
+	h = vec3_cross(rayVector, edge2);
+	a = vec3_dot(edge1, h);
+
+	if (a > -EPSILON && a < EPSILON)
+		return 0;    // This ray is parallel to this triangle.
+
+	f = 1.0/a;
+	s = vec3_sub(rayOrigin, vertex0);
+	u = f * vec3_dot(s, h);
+
+	if (u < 0.0 || u > 1.0)
+		return 0;
+
+	q = vec3_cross(s, edge1);
+	v = f * vec3_dot(rayVector, q);
+
+	if (v < 0.0 || u + v > 1.0)
+		return 0;
+
+	// At this stage we can compute t to find out where the intersection point is on the line.
+	float t = f * vec3_dot(edge2, q);
+	if (t > EPSILON && t < 1/EPSILON) {
+		vec3 tmp = vec3_sum(rayOrigin, vec3_scale(t, rayVector));
+		out->x = tmp.x; out->y = tmp.y; out->z = tmp.z;
+		dist = &t;
+		return 1;
+	} else // This means that there is a line intersection but not a ray intersection.
+		return 0;
 }

@@ -8,12 +8,18 @@
 #include "mesh.h"
 #include "camera.h"
 #include "texture.h"
+#include "noise.h"
 
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 960
 
+#define TERRAIN_WIDTH 64;
+
 static SDL_Window *init_window(int width, int height);
 static SDL_GLContext init_glcontext(SDL_Window *window);
+
+static GLuint dotVAO;
+static GLuint dot_shader;
 	
 struct object {
 	struct mesh m;
@@ -28,7 +34,8 @@ struct object {
 struct terrain {
 	struct mesh m;
 	GLuint shader;
-	// collision surface
+	struct triangle *surface;
+	struct mesh surface_mesh; /* for debugging */
 	GLuint heightmap;
 	GLuint texture[5];
 };
@@ -57,6 +64,68 @@ struct context {
 
 vec3 fcolor;
 float gtime;
+
+vec3 sample_height(float x, float z)
+{
+	float amplitude = 8.0;
+	//return vec3_make(x, fbm_noise(x, z), z);
+	return vec3_make(x, amplitude * fbm_noise(x*16, z*16), z);
+}
+
+void make_terrain_surface(struct terrain *terra)
+{
+	int width = TERRAIN_WIDTH;
+	int length = TERRAIN_WIDTH;
+	float offset = 1.0;
+
+	terra->surface_mesh.vcount = 3 * 2 * width * length;
+	terra->surface = calloc(2 * width * length, sizeof(struct triangle));
+
+	vec2 origin = {0.0, 0.0};
+	int ntri = 0;
+	for (int i = 0; i < width; i++) {
+		for (int j = 0; j < length; j++) {
+			terra->surface[ntri].a = sample_height(origin.x+offset, origin.y+offset);
+			terra->surface[ntri].b = sample_height(origin.x+offset, origin.y);
+			terra->surface[ntri].c = sample_height(origin.x, origin.y);
+			ntri++;
+			terra->surface[ntri].a = sample_height(origin.x,origin.y+offset);
+			terra->surface[ntri].b = sample_height(origin.x+offset, origin.y+offset);
+			terra->surface[ntri].c = sample_height(origin.x, origin.y);
+			ntri++;
+
+			origin.x += offset;
+		}
+		origin.x = 0.0;
+		origin.y += offset;
+	}
+
+	vec3 *positions = calloc(terra->m.vcount, sizeof(vec3));
+	int n = 0;
+	for (int i = 0; i < 2 * width * length; i++) {
+		positions[n++] = terra->surface[i].a;
+		positions[n++] = terra->surface[i].b;
+		positions[n++] = terra->surface[i].c;
+	}
+
+	glGenVertexArrays(1, &terra->surface_mesh.VAO);
+	glBindVertexArray(terra->surface_mesh.VAO);
+
+	GLuint vbo;
+	glGenBuffers(1, &vbo);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, terra->surface_mesh.vcount * sizeof(vec3), positions, GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), BUFFER_OFFSET(0));
+
+	glBindVertexArray(0);
+	glDisableVertexAttribArray(0);
+	glDeleteBuffers(1, &vbo);
+
+	free(positions);
+}
 
 struct object make_standard_object(void)
 {
@@ -195,6 +264,7 @@ struct terrain make_terrain(GLuint heightmap)
 	};
 	ter.shader = load_shaders(pipeline);
 	ter.m = make_grid_mesh(64, 64, 1.0);
+	make_terrain_surface(&ter);
 
 	ter.heightmap = heightmap;
 	ter.texture[0] = load_dds_texture("data/texture/grass.dds");
@@ -234,9 +304,9 @@ void display_terrain(struct terrain *ter)
 	glBindTexture(GL_TEXTURE_2D, ter->heightmap);
 
 	glBindVertexArray(ter->m.VAO);
-//	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glDrawArrays(GL_PATCHES, 0, ter->m.vcount);
-//	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
 void display_scene(struct scene *scene)
@@ -245,6 +315,10 @@ void display_scene(struct scene *scene)
 
 	display_terrain(&scene->terrain);
 	display_standard_object(&scene->object);
+	glPointSize(3.0);
+	glUseProgram(dot_shader);
+	glBindVertexArray(dotVAO);
+	glDrawArrays(GL_POINTS, 0, 2);
 	display_water(&scene->water);
 	display_skybox(&scene->skybox);
 }
@@ -267,7 +341,7 @@ void update_context(struct context *context)
 		context->camera.speed = 4.0;
 	}
 
-	update_camera(&context->camera, context->delta);
+	update_free_camera(&context->camera, context->delta);
 	mat4 view = make_view_matrix(context->camera.eye, context->camera.center, context->camera.up);
 	mat4 skybox_view = view;
 	skybox_view.f[12] = 0.0;
@@ -277,13 +351,23 @@ void update_context(struct context *context)
 	fcolor.x = 0.0;
 	fcolor.y = 0.0;
 	fcolor.z = 0.0;
-	if (test_ray_AABB(context->camera.eye, context->camera.center, context->scene.object.bbox)) {
-		if (keystates[SDL_SCANCODE_SPACE]) {
-			context->scene.object.bbox.c = vec3_sum(context->camera.eye, context->camera.center);
-		}
-		fcolor.y = 0.5;
-	}
 
+	vec3 intersect = {0.0};
+	vec3 cart = context->scene.object.bbox.c;
+	int width = TERRAIN_WIDTH;
+	int ntriangles = 2 * width * width;
+	float dist = 0;
+	float min = 1000;
+	for (int i; i < ntriangles; i++) {
+		if (ray_intersects_triangle(context->camera.eye, context->camera.center, &context->scene.terrain.surface[i], &intersect, &dist)) {
+			if (dist < min) {
+				min = dist;
+				cart = intersect;
+			}
+		}
+	}
+	context->scene.object.bbox.c = cart;
+	
 	glUseProgram(context->scene.terrain.shader);
 	glUniformMatrix4fv(glGetUniformLocation(context->scene.terrain.shader, "view"), 1, GL_FALSE, view.f);
 	glUniform3fv(glGetUniformLocation(context->scene.terrain.shader, "view_center"), 1, context->camera.center.f);
@@ -301,10 +385,33 @@ void update_context(struct context *context)
 
 void run_game(SDL_Window *window)
 {
-	struct context context;
+	struct shader pipeline[] = {
+		{GL_VERTEX_SHADER, "data/shader/dotv.glsl"},
+		{GL_FRAGMENT_SHADER, "data/shader/dotf.glsl"},
+		{GL_NONE, NULL}
+	};
+	dot_shader = load_shaders(pipeline);
+	struct context context = {0};
 	load_scene(&context.scene);
-	context.camera = init_camera(10.0, 5.0, 10.0, 90.0, 0.2);
+	context.camera = init_camera(10.0, 10.0, 10.0, 90.0, 0.2);
 	float start, end = 0.0;
+
+	float dot[2] = {0.0, 0.0};
+	glGenVertexArrays(1, &dotVAO);
+	glBindVertexArray(dotVAO);
+
+	GLuint vbo;
+	glGenBuffers(1, &vbo);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER, 2 * sizeof(float), dot, GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
+
+	glBindVertexArray(0);
+	glDisableVertexAttribArray(0);
+	glDeleteBuffers(1, &vbo);
 
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 	SDL_Event event;
@@ -322,6 +429,8 @@ void run_game(SDL_Window *window)
 		SDL_GL_SwapWindow(window);
 		end = start;
 	}
+
+	free(context.scene.terrain.surface);
 }
 
 static SDL_Window *init_window(int width, int height)

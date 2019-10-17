@@ -1,8 +1,9 @@
 #define IDENTITY_MATRIX {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#define max(a, b) ((a) > (b) ? (a) : (b))
 
 typedef union {
-	float f[2];
-	struct { float x, y; };
+	float f[2]; struct { float x, y; };
 } vec2;
 
 typedef union {
@@ -24,6 +25,22 @@ typedef union {
 	float f[16];
 	vec4 row[4];
 } mat4;
+
+struct triangle {
+	vec3 a, b, c;
+	vec3 normal;
+};
+
+struct rect {
+	vec2 min;
+	vec2 max;
+};
+
+struct quadtree {
+	struct rect area;
+	float minheight;
+	float maxheight;
+};
 
 struct sphere {
 	vec3 c; // sphere center
@@ -60,3 +77,6 @@ mat4 identity_matrix(void);
 
 int test_ray_AABB(vec3 p, vec3 d, struct AABB a);
 int test_ray_sphere(vec3 p, vec3 d, struct sphere s);
+vec3 barycentric_ray_triangle(vec3 p, vec3 q, vec3 a, vec3 b, vec3 c);
+vec3 barycentric_to_cartesian(vec3 bar, vec3 a, vec3 b, vec3 c);
+int ray_intersects_triangle(vec3 rayOrigin, vec3 rayVector, struct triangle *tri, vec3 *out, float *dist);
