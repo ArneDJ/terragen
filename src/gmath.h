@@ -68,6 +68,7 @@ vec3 vec3_sum(vec3 a, vec3 b);
 vec3 vec3_sub(vec3 a, vec3 b);
 vec3 vec3_cross(vec3 a, vec3 b);
 vec3 vec3_crossn(vec3 a, vec3 b);
+float vec3_magnitude(vec3 v);
 
 mat4 make_project_matrix(int fov, float aspect, float near, float far);
 mat4 make_view_matrix(vec3 eye, vec3 center, vec3 up);

@@ -89,11 +89,11 @@ GLuint load_dds_texture(const char *fpath)
 	return texnum;
 }
 
+typedef unsigned char pixel[3];
 GLuint make_heightmap_texture(void)
 {
 	GLuint texnum;
 	const size_t len = 1024 * 1024;
-	typedef unsigned char pixel[3];
 	pixel *image = calloc(len, sizeof(pixel));
 
 	int n = 0;
@@ -122,3 +122,33 @@ GLuint make_heightmap_texture(void)
 
 	return texnum;
 }
+
+GLuint make_voronoi_texture(void)
+{
+	GLuint texnum;
+	size_t len = 1024 * 1024;
+	unsigned char *buf = gen_voronoi_map();
+	pixel *image = calloc(len, sizeof(pixel));
+	int nbuf = 0;
+	for (int i = 0; i < len; i++) {
+		image[i][0] = buf[nbuf++];
+		image[i][1] = buf[nbuf++];
+		image[i][2] = buf[nbuf++];
+	}
+
+	glGenTextures(1, &texnum);
+	glBindTexture(GL_TEXTURE_2D, texnum);
+	//glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB16, 1024, 1024);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, 1024, 1024);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1024, 1024, GL_RGB, GL_UNSIGNED_BYTE, image[0]);
+	//glTexImage2D(GL_TEXTURE_2D, 1, GL_RGB, 1024, 1024, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	free(buf);
+	free(image);
+
+	return texnum;
+}
+

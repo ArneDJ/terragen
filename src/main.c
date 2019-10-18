@@ -20,6 +20,9 @@ static SDL_GLContext init_glcontext(SDL_Window *window);
 
 static GLuint dotVAO;
 static GLuint dot_shader;
+static vec3 box_velocity = {0.0};
+static vec3 box_destination;
+static SDL_Event event;
 	
 struct object {
 	struct mesh m;
@@ -29,6 +32,13 @@ struct object {
 	vec3 rotation;
 	vec3 scale;
 	struct AABB bbox;
+};
+
+struct map {
+	struct mesh m;
+	GLuint shader;
+	GLuint heightmap;
+	GLuint texture;
 };
 
 struct terrain {
@@ -53,6 +63,7 @@ struct scene {
 	struct water water;
 	struct object skybox;
 	struct object object;
+	struct map map;
 	GLuint heightmap;
 };
 
@@ -64,6 +75,28 @@ struct context {
 
 vec3 fcolor;
 float gtime;
+
+struct map make_map(void) 
+{
+	struct map map;
+
+	map.m = make_grid_mesh(64, 64, 1.0); 
+
+	struct shader pipeline[] = {
+		{GL_VERTEX_SHADER, "data/shader/mapv.glsl"},
+		{GL_FRAGMENT_SHADER, "data/shader/mapf.glsl"},
+		{GL_NONE, NULL}
+	};
+	map.shader = load_shaders(pipeline);
+
+	map.texture = make_voronoi_texture();
+
+	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
+	glUseProgram(map.shader);
+	glUniformMatrix4fv(glGetUniformLocation(map.shader, "project"), 1, GL_FALSE, project.f);
+
+	return map;
+}
 
 vec3 sample_height(float x, float z)
 {
@@ -208,6 +241,16 @@ void display_water(struct water *wat)
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
+void display_map(struct map *map)
+{
+	glUseProgram(map->shader);
+	glUniform1i(glGetUniformLocation(map->shader, "voronoi"), 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, map->texture);
+	glBindVertexArray(map->m.VAO);
+	glDrawArrays(GL_TRIANGLES, 0, map->m.vcount);
+}
+
 struct object make_skybox(void)
 {
 	struct object skybox = {0};
@@ -320,6 +363,7 @@ void display_scene(struct scene *scene)
 	glBindVertexArray(dotVAO);
 	glDrawArrays(GL_POINTS, 0, 2);
 	display_water(&scene->water);
+	display_map(&scene->map);
 	display_skybox(&scene->skybox);
 }
 
@@ -331,6 +375,8 @@ void load_scene(struct scene *scene)
 	scene->terrain = make_terrain(scene->heightmap);
 	scene->water = make_water(scene->heightmap);
 	scene->object = make_standard_object();
+
+	scene->map = make_map();
 }
 
 void update_context(struct context *context)
@@ -358,15 +404,37 @@ void update_context(struct context *context)
 	int ntriangles = 2 * width * width;
 	float dist = 0;
 	float min = 1000;
-	for (int i; i < ntriangles; i++) {
-		if (ray_intersects_triangle(context->camera.eye, context->camera.center, &context->scene.terrain.surface[i], &intersect, &dist)) {
-			if (dist < min) {
-				min = dist;
-				cart = intersect;
+	const float box_speed = 2.0;
+	if (test_ray_AABB(context->camera.eye, context->camera.center, context->scene.object.bbox)) {
+		fcolor.y = 0.5;
+	}
+	if (event.button.button == SDL_BUTTON_RIGHT) {
+		for (int i; i < ntriangles; i++) {
+			if (ray_intersects_triangle(context->camera.eye, context->camera.center, &context->scene.terrain.surface[i], &intersect, &dist)) {
+				if (dist < min) {
+					min = dist;
+					cart = intersect;
+					box_destination = cart;
+					box_velocity = vec3_sub(cart, context->scene.object.bbox.c);
+					box_velocity = vec3_normalize(box_velocity);
+				}
 			}
 		}
 	}
-	context->scene.object.bbox.c = cart;
+
+	const vec3 down = {0.0, -1.0, 0.0};
+	vec3 box_ray = {context->scene.object.bbox.c.x, context->scene.object.bbox.c.y + 1.0, context->scene.object.bbox.c.z};
+	for (int i = 0; i < ntriangles; i++) {
+		if (ray_intersects_triangle(box_ray, down, &context->scene.terrain.surface[i], &intersect, &dist)) {
+			context->scene.object.bbox.c = intersect;
+		}
+	}
+	float magn = vec3_magnitude(vec3_sub(box_destination, context->scene.object.bbox.c));
+	if (magn < 0.1) {
+		box_velocity.x = 0.0; box_velocity.y = 0.0; box_velocity.z = 0.0;
+	} else {
+		context->scene.object.bbox.c = vec3_sum(context->scene.object.bbox.c, vec3_scale(context->delta * box_speed, box_velocity));
+	}
 	
 	glUseProgram(context->scene.terrain.shader);
 	glUniformMatrix4fv(glGetUniformLocation(context->scene.terrain.shader, "view"), 1, GL_FALSE, view.f);
@@ -379,6 +447,8 @@ void update_context(struct context *context)
 	glUniform1f(glGetUniformLocation(context->scene.water.shader, "time"), gtime);
 	glUseProgram(context->scene.object.shader);
 	glUniformMatrix4fv(glGetUniformLocation(context->scene.object.shader, "view"), 1, GL_FALSE, view.f);
+	glUseProgram(context->scene.map.shader);
+	glUniformMatrix4fv(glGetUniformLocation(context->scene.map.shader, "view"), 1, GL_FALSE, view.f);
 	glUseProgram(context->scene.skybox.shader);
 	glUniformMatrix4fv(glGetUniformLocation(context->scene.skybox.shader, "view"), 1, GL_FALSE, skybox_view.f);
 }
@@ -414,7 +484,6 @@ void run_game(SDL_Window *window)
 	glDeleteBuffers(1, &vbo);
 
 	SDL_SetRelativeMouseMode(SDL_TRUE);
-	SDL_Event event;
 	while (event.type != SDL_QUIT) {
 		gtime = (float)SDL_GetTicks();
 		start = gtime * 0.001;
@@ -422,7 +491,6 @@ void run_game(SDL_Window *window)
 		context.delta = delta;
 
 		while(SDL_PollEvent(&event));
-
 		update_context(&context);
 		display_scene(&context.scene);
 
