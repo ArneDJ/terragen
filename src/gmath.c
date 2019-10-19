@@ -30,6 +30,18 @@ float clamp(float n, float min, float max)
 	return n;
 }
 
+/* Vector stuff
+ *
+ *
+ *
+ *
+ */
+
+float vec2_dot(vec2 a, vec2 b)
+{
+	return a.x * b.x + a.y * b.y;
+}
+
 vec3 vec3_make(float x, float y, float z)
 {
 	vec3 v = {x, y, z};
@@ -95,6 +107,197 @@ float scalar_triple_product(vec3 u, vec3 v, vec3 w)
 	return vec3_dot(vec3_cross(u, v), w);
 }
 
+/*
+ *
+ *	Matrix stuff
+ *
+ */
+mat4 make_project_matrix(int fov, float aspect, float near, float far)
+{
+	float rad = (float)fov * ((2.0 * M_PI) / 360.0);
+	float range = tan(0.5 * rad) * near;
+
+	float x = (2.0 * near) / (range * aspect + range * aspect);
+	float y = near / range;
+	float z = -(far + near) / (far - near);
+	float w = -(2.0 * far * near) / (far - near);
+
+	mat4 project = {
+		x, 0.0, 0.0, 0.0,
+		0.0, y, 0.0, 0.0,
+		0.0, 0.0, z, -1.0,
+		0.0, 0.0, w, 0.0
+	};
+
+	return project;
+}
+
+mat4 make_view_matrix(vec3 eye, vec3 center, vec3 up)
+{
+	vec3 target = vec3_sum(eye, center);
+
+	vec3 f = vec3_sub(target, eye);
+	f = vec3_normalize(f);
+
+	vec3 s = vec3_crossn(f, up);
+	vec3 u = vec3_cross(s, f);
+
+	mat4 view = {
+		s.x, u.x, -f.x, 0.0,
+		s.y, u.y, -f.y, 0.0,
+		s.z, u.z, -f.z, 0.0,
+		-vec3_dot(s, eye), -vec3_dot(u, eye), vec3_dot(f, eye), 1.0
+	};
+
+	return view;
+}
+
+static mat4 rot_mat4_mat4(mat4 m1, mat4 m2)
+{
+	mat4 dest;
+
+	float a00 = m1.f[0], a01 = m1.f[1], a02 = m1.f[2], a03 = m1.f[3],
+	a10 = m1.f[4], a11 = m1.f[5], a12 = m1.f[6], a13 = m1.f[7],
+	a20 = m1.f[8], a21 = m1.f[9], a22 = m1.f[10], a23 = m1.f[11],
+	a30 = m1.f[12], a31 = m1.f[13], a32 = m1.f[14], a33 = m1.f[15],
+
+	b00 = m2.f[0], b01 = m2.f[1], b02 = m2.f[2],
+	b10 = m2.f[4], b11 = m2.f[5], b12 = m2.f[6],
+	b20 = m2.f[8], b21 = m2.f[9], b22 = m2.f[10];
+
+	dest.f[0] = a00 * b00 + a10 * b01 + a20 * b02;
+	dest.f[1] = a01 * b00 + a11 * b01 + a21 * b02;
+	dest.f[2] = a02 * b00 + a12 * b01 + a22 * b02;
+	dest.f[3] = a03 * b00 + a13 * b01 + a23 * b02;
+
+	dest.f[4] = a00 * b10 + a10 * b11 + a20 * b12;
+	dest.f[5] = a01 * b10 + a11 * b11 + a21 * b12;
+	dest.f[6] = a02 * b10 + a12 * b11 + a22 * b12;
+	dest.f[7] = a03 * b10 + a13 * b11 + a23 * b12;
+
+	dest.f[8] = a00 * b20 + a10 * b21 + a20 * b22;
+	dest.f[9] = a01 * b20 + a11 * b21 + a21 * b22;
+	dest.f[10] = a02 * b20 + a12 * b21 + a22 * b22;
+	dest.f[11] = a03 * b20 + a13 * b21 + a23 * b22;
+
+	dest.f[12] = a30;
+	dest.f[13] = a31;
+	dest.f[14] = a32;
+	dest.f[15] = a33;
+
+	return dest;
+}
+
+void mat4_translate(mat4 *m, vec3 v)
+{
+	m->f[12] = v.x;
+	m->f[13] = v.y;
+	m->f[14] = v.z;
+}
+
+mat4 mat4_rotate_x(mat4 matrix, float angle)
+{
+	mat4 unit = IDENTITY_MATRIX;
+	float c = cosf(angle);
+	float s = sinf(angle);
+
+	unit.f[5] = c;
+	unit.f[6] = s;
+	unit.f[9] = -s;
+	unit.f[10] = c;
+
+	return rot_mat4_mat4(matrix, unit);
+}
+
+mat4 mat4_rotate_y(mat4 matrix, float angle)
+{
+	mat4 unit = IDENTITY_MATRIX;
+	float c = cosf(angle);
+	float s = sinf(angle);
+
+	unit.f[0] = c;
+	unit.f[2] = -s;
+	unit.f[8] = s;
+	unit.f[10] = c;
+
+	return rot_mat4_mat4(matrix, unit);
+}
+
+mat4 mat4_rotate_z(mat4 matrix, float angle)
+{
+	mat4 unit = IDENTITY_MATRIX;
+	float c = cosf(angle);
+	float s = sinf(angle);
+
+	unit.f[0] = c;
+	unit.f[1] = s;
+	unit.f[4] = -s;
+	unit.f[5] = c;
+
+	return rot_mat4_mat4(matrix, unit);
+}
+
+mat4 mat4_rotate_xyz(mat4 matrix, float x, float y, float z)
+{
+	mat4 mat;
+	mat = mat4_rotate_x(matrix, x);
+	mat = mat4_rotate_y(mat, y);
+	mat = mat4_rotate_z(mat, z);
+
+	return mat;
+}
+
+mat4 identity_matrix(void)
+{
+	mat4 tmp = IDENTITY_MATRIX;
+	return tmp;
+}
+
+/*
+ *
+ *	Ray intersection stuff
+ *
+ */
+int ray_intersects_triangle(vec3 rayOrigin, vec3 rayVector, struct triangle *tri, vec3 *out, float *dist)
+{
+	const float EPSILON = 0.0000001;
+	vec3 vertex0 = tri->a;
+	vec3 vertex1 = tri->b;
+	vec3 vertex2 = tri->c;
+	vec3 edge1, edge2, h, s, q;
+	float a,f,u,v;
+	edge1 = vec3_sub(vertex1, vertex0);
+	edge2 = vec3_sub(vertex2, vertex0);
+	h = vec3_cross(rayVector, edge2);
+	a = vec3_dot(edge1, h);
+
+	if (a > -EPSILON && a < EPSILON)
+		return 0;    // This ray is parallel to this triangle.
+
+	f = 1.0/a;
+	s = vec3_sub(rayOrigin, vertex0);
+	u = f * vec3_dot(s, h);
+
+	if (u < 0.0 || u > 1.0)
+		return 0;
+
+	q = vec3_cross(s, edge1);
+	v = f * vec3_dot(rayVector, q);
+
+	if (v < 0.0 || u + v > 1.0)
+		return 0;
+
+	// At this stage we can compute t to find out where the intersection point is on the line.
+	float t = f * vec3_dot(edge2, q);
+	if (t > EPSILON && t < 1/EPSILON) {
+		vec3 tmp = vec3_sum(rayOrigin, vec3_scale(t, rayVector));
+		out->x = tmp.x; out->y = tmp.y; out->z = tmp.z;
+		dist = &t;
+		return 1;
+	} else // This means that there is a line intersection but not a ray intersection.
+		return 0;
+}
+
 vec3 barycentric(vec3 a, vec3 b, vec3 c, vec3 p) 
 {
 	vec3 v0 = vec3_sub(b, a);
@@ -144,38 +347,6 @@ int test_ray_sphere(vec3 p, vec3 d, struct sphere s)
 
 	return 1;
 }
-
-/*
-int test_ray_AABB(vec3 p, vec3 d, struct AABB a)
-{
-	float tmin = 0.0f;
-	float tmax = FLT_MAX;
-	//vec3 min = {a.c.x - a.r[0], a.c.y - a.r[1], a.c.z - a.r[2]};
-	//vec3 max = {a.c.x + a.r[0], a.c.y + a.r[1], a.c.z + a.r[2]};
-	vec3 min = {-0.5, -0.5, -0.5};
-	vec3 max = {0.5, 0.5, 0.5};
-
-	for(int i = 0; i < 3; i++) {
-		if (fabs(d.f[i]) < FLT_EPSILON) {
-			// ray is parallel to slab
-			if (p.f[i] < min.f[i] || p.f[i] > max.f[i])	return 0;
-		} else {
-			float ood = 1.0 / d.f[i];
-			float t1 = (min.f[i] - p.f[i]) * ood;
-			float t2 = (max.f[i] - p.f[i]) * ood;
-
-			if (t1 > t2)	swap(&t1, &t2);
-
-			if (t1 > tmin)	tmin = t1;
-			if (t2 > tmax)	tmax = t2;
-
-			if (tmin > tmax)	return 0;
-		}
-	}
-	
-	return 1;
-}
-*/
 
 int test_ray_AABB(vec3 p, vec3 d, struct AABB a)
 {
@@ -249,170 +420,4 @@ int test_ray_triangle(vec3 p, vec3 q, vec3 a, vec3 b, vec3 c)
 		return 0;
 
 	return 1;
-}
-
-/* DEPRECATED
-int test_ray_triangle(vec3 p, vec3 q, vec3 a, vec3 b, vec3 c)
-{
-	vec3 v0v1 = vec3_sub(b, a);
-	vec3 v0v2 = vec3_sub(c, a);
-
-	vec3 pvec = vec3_cross(q, v0v2);
-
-	float det = vec3_dot(v0v1, pvec);
-
-	if (det < 0.000001)
-		return 0;
-
-	float invDet = 1.0 / det;
-
-	vec3 tvec = vec3_sub(p, a);
-
-	float u = vec3_dot(tvec, pvec) * invDet;
-
-	if (u < 0 || u > 1)
-		return 0;
-
-	vec3 qvec = vec3_cross(tvec, v0v1);
-
-	float v = vec3_dot(q, qvec) * invDet;
-
-	if (v < 0 || u + v > 1)
-		return 0;
-
-	return 1;
-}
-*/
-
-/* DEPRECATED
-vec3 barycentric_ray_triangle(vec3 p, vec3 q, vec3 a, vec3 b, vec3 c)
-{
-	vec3 tmp;
-
-	vec3 bc = vec3_sub(b, c);
-	vec3 ac = vec3_sub(a, c);
-	vec3 qp = vec3_sub(p, q);
-
-	vec3 n = vec3_cross(bc, ac);
-	float d = vec3_dot(qp, n);	
-
-	vec3 ap = vec3_sub(p, c);
-	vec3 e = vec3_cross(qp, ap);
-	tmp.y = vec3_dot(ac, e);
-	tmp.z = -vec3_dot(bc, e);
-
-	float ood = 1.0 / d;
-
-	tmp.y *= ood;
-	tmp.z *= ood;
-	tmp.x = 1.0 - tmp.y - tmp.z;
-
-	return tmp;
-}
-*/
-
-/* DEPRECATED 
-vec3 barycentric_to_cartesian(vec3 bar, vec3 a, vec3 b, vec3 c)
-{
-	vec3 tmp;
-
-	tmp.x = bar.x * a.x + bar.y * b.x + bar.z * c.x;
-	tmp.y = bar.x * a.y + bar.y * b.y + bar.z * c.y;
-	tmp.z = bar.x * a.z + bar.y * b.z + bar.z * c.z;
-
-	return tmp;
-}
-*/
-
-mat4 make_project_matrix(int fov, float aspect, float near, float far)
-{
-	float rad = (float)fov * ((2.0 * M_PI) / 360.0);
-	float range = tan(0.5 * rad) * near;
-
-	float x = (2.0 * near) / (range * aspect + range * aspect);
-	float y = near / range;
-	float z = -(far + near) / (far - near);
-	float w = -(2.0 * far * near) / (far - near);
-
-	mat4 project = {
-		x, 0.0, 0.0, 0.0,
-		0.0, y, 0.0, 0.0,
-		0.0, 0.0, z, -1.0,
-		0.0, 0.0, w, 0.0
-	};
-
-	return project;
-}
-
-mat4 make_view_matrix(vec3 eye, vec3 center, vec3 up)
-{
-	vec3 target = vec3_sum(eye, center);
-
-	vec3 f = vec3_sub(target, eye);
-	f = vec3_normalize(f);
-
-	vec3 s = vec3_crossn(f, up);
-	vec3 u = vec3_cross(s, f);
-
-	mat4 view = {
-		s.x, u.x, -f.x, 0.0,
-		s.y, u.y, -f.y, 0.0,
-		s.z, u.z, -f.z, 0.0,
-		-vec3_dot(s, eye), -vec3_dot(u, eye), vec3_dot(f, eye), 1.0
-	};
-
-	return view;
-}
-
-void mat4_translate(mat4 *m, vec3 v)
-{
-	m->f[12] = v.x;
-	m->f[13] = v.y;
-	m->f[14] = v.z;
-}
-
-mat4 identity_matrix(void)
-{
-	mat4 tmp = IDENTITY_MATRIX;
-	return tmp;
-}
-
-int ray_intersects_triangle(vec3 rayOrigin, vec3 rayVector, struct triangle *tri, vec3 *out, float *dist)
-{
-	const float EPSILON = 0.0000001;
-	vec3 vertex0 = tri->a;
-	vec3 vertex1 = tri->b;
-	vec3 vertex2 = tri->c;
-	vec3 edge1, edge2, h, s, q;
-	float a,f,u,v;
-	edge1 = vec3_sub(vertex1, vertex0);
-	edge2 = vec3_sub(vertex2, vertex0);
-	h = vec3_cross(rayVector, edge2);
-	a = vec3_dot(edge1, h);
-
-	if (a > -EPSILON && a < EPSILON)
-		return 0;    // This ray is parallel to this triangle.
-
-	f = 1.0/a;
-	s = vec3_sub(rayOrigin, vertex0);
-	u = f * vec3_dot(s, h);
-
-	if (u < 0.0 || u > 1.0)
-		return 0;
-
-	q = vec3_cross(s, edge1);
-	v = f * vec3_dot(rayVector, q);
-
-	if (v < 0.0 || u + v > 1.0)
-		return 0;
-
-	// At this stage we can compute t to find out where the intersection point is on the line.
-	float t = f * vec3_dot(edge2, q);
-	if (t > EPSILON && t < 1/EPSILON) {
-		vec3 tmp = vec3_sum(rayOrigin, vec3_scale(t, rayVector));
-		out->x = tmp.x; out->y = tmp.y; out->z = tmp.z;
-		dist = &t;
-		return 1;
-	} else // This means that there is a line intersection but not a ray intersection.
-		return 0;
 }

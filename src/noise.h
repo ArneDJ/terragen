@@ -1,3 +1,8 @@
+float fbm_noise(float x, float y, float freq, float lacun, float gain);
 
-float fbm_noise(float x, float y);
 unsigned char *gen_voronoi_map();
+
+
+
+
+float fbm_map_value(float x, float y, float freq, float lacun, float gain);

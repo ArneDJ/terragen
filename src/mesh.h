@@ -12,6 +12,10 @@ struct mesh {
 };
 
 struct mesh make_cube_mesh(void);
-struct mesh make_grid_mesh(int width, int length, float offset);
 
 void instance_mesh(struct mesh *m, int amount, vec3 *positions);
+
+
+
+
+struct mesh make_grid_mesh(int width, int length, float offset);

@@ -22,6 +22,7 @@ static GLuint dotVAO;
 static GLuint dot_shader;
 static vec3 box_velocity = {0.0};
 static vec3 box_destination;
+static vec3 box_rotation = {0.0};
 static SDL_Event event;
 	
 struct object {
@@ -98,17 +99,16 @@ struct map make_map(void)
 	return map;
 }
 
-vec3 sample_height(float x, float z)
+static vec3 sample_height(float x, float z)
 {
 	float amplitude = 8.0;
-	//return vec3_make(x, fbm_noise(x, z), z);
-	return vec3_make(x, amplitude * fbm_noise(x*16, z*16), z);
+	return vec3_make(x, amplitude * fbm_map_value(x*16, z*16, 0.004, 2.5, 2.0), z);
 }
 
 void make_terrain_surface(struct terrain *terra)
 {
-	int width = TERRAIN_WIDTH;
-	int length = TERRAIN_WIDTH;
+	int width = 64;
+	int length = 64;
 	float offset = 1.0;
 
 	terra->surface_mesh.vcount = 3 * 2 * width * length;
@@ -133,7 +133,7 @@ void make_terrain_surface(struct terrain *terra)
 		origin.y += offset;
 	}
 
-	vec3 *positions = calloc(terra->m.vcount, sizeof(vec3));
+	vec3 *positions = calloc(terra->surface_mesh.vcount, sizeof(vec3));
 	int n = 0;
 	for (int i = 0; i < 2 * width * length; i++) {
 		positions[n++] = terra->surface[i].a;
@@ -193,6 +193,7 @@ void display_standard_object(struct object *obj)
 {
 	mat4 model = IDENTITY_MATRIX;
 	mat4_translate(&model, obj->bbox.c);
+	model = mat4_rotate_y(model, atanf(box_rotation.x / box_rotation.z));
 
 	glUseProgram(obj->shader);
 	glUniform3fv(glGetUniformLocation(obj->shader, "fcolor"), 1, fcolor.f);
@@ -346,9 +347,13 @@ void display_terrain(struct terrain *ter)
 	glActiveTexture(GL_TEXTURE4);
 	glBindTexture(GL_TEXTURE_2D, ter->heightmap);
 
-	glBindVertexArray(ter->m.VAO);
+	glUniform1i(glGetUniformLocation(ter->shader, "voronoi"), 5);
+	glActiveTexture(GL_TEXTURE5);
+	glBindTexture(GL_TEXTURE_2D, ter->texture[4]);
+
+	glBindVertexArray(ter->surface_mesh.VAO);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glDrawArrays(GL_PATCHES, 0, ter->m.vcount);
+	glDrawArrays(GL_PATCHES, 0, ter->surface_mesh.vcount);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
@@ -375,8 +380,9 @@ void load_scene(struct scene *scene)
 	scene->terrain = make_terrain(scene->heightmap);
 	scene->water = make_water(scene->heightmap);
 	scene->object = make_standard_object();
-
 	scene->map = make_map();
+
+	scene->terrain.texture[4] = scene->map.texture;
 }
 
 void update_context(struct context *context)
@@ -417,6 +423,7 @@ void update_context(struct context *context)
 					box_destination = cart;
 					box_velocity = vec3_sub(cart, context->scene.object.bbox.c);
 					box_velocity = vec3_normalize(box_velocity);
+					box_rotation = box_velocity;
 				}
 			}
 		}

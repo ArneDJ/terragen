@@ -7,6 +7,7 @@ uniform sampler2D checker;
 uniform sampler2D stone;
 uniform sampler2D sand;
 uniform sampler2D snow;
+uniform sampler2D voronoi;
 uniform vec3 view_center;
 uniform vec3 view_eye;
 
@@ -16,6 +17,7 @@ in vec2 uv;
 in float height;
 
 const vec3 light_dir = vec3(1.0, 1.0, 1.0);
+const float scale = 0.015625;
 
 float orenNayarDiffuse(vec3 lightDirection, vec3 viewDirection, vec3 surfaceNormal, float roughness, float albedo) 
 {
@@ -53,10 +55,12 @@ void main(void)
 	vec3 stonef = texture(stone, uv).xyz;
 	vec3 sandf = texture(sand, uv).xyz;
 	vec3 snowf = texture(snow, uv).xyz;
+	vec3 voronoif = texture(voronoi,scale * uv).xyz;
 
 	vec3 material = mix(grassf, snowf, smoothstep(0.7, 0.75, height));
-	material = mix(material, stonef, smoothstep(0.01, 0.04, slope));
-	material = mix(sandf, material, smoothstep(0.58, 0.59, height));
+	material = mix(material, stonef, smoothstep(0.0, 0.02, slope));
+	material = mix(material, voronoif, 0.4);
+	material = mix(sandf, material, smoothstep(0.57, 0.58, height));
 
 	vec3 view_dir = normalize(view_eye - fpos);
 
