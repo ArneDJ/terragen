@@ -54,13 +54,13 @@ void main(void)
 	vec3 grassf = texture(grass, uv).xyz;
 	vec3 stonef = texture(stone, uv).xyz;
 	vec3 sandf = texture(sand, uv).xyz;
-	vec3 snowf = texture(snow, uv).xyz;
+	vec3 snowf = texture(snow, 0.1 * uv).xyz;
 	vec3 voronoif = texture(voronoi,scale * uv).xyz;
 
-	vec3 material = mix(grassf, snowf, smoothstep(0.7, 0.75, height));
+	vec3 material = mix(grassf, snowf, smoothstep(0.7, 0.75, fpos.y / 8.0));
 	material = mix(material, stonef, smoothstep(0.0, 0.02, slope));
-	material = mix(material, voronoif, 0.4);
-	material = mix(sandf, material, smoothstep(0.57, 0.58, height));
+//	material = mix(material, voronoif, 0.4);
+	material = mix(sandf, material, smoothstep(0.57, 0.58, fpos.y / 8.0));
 
 	vec3 view_dir = normalize(view_eye - fpos);
 

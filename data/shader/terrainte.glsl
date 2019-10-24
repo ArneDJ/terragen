@@ -3,13 +3,15 @@
 
 layout(triangles) in;
 uniform sampler2D heightmap;
+uniform sampler2D range;
 uniform mat4 view, project;
-uniform float amplitude = 8.0;
 
 out vec3 bump;
 out vec3 fpos;
 out vec2 uv;
 out float height;
+
+float mask;
 
 float random(in vec2 st) {
 	return fract(sin(dot(st.xy, vec2(1.9898,78.233)))*43758.5453123);
@@ -49,15 +51,15 @@ float fbm(in vec2 st) {
 	return value;
 }
 
-vec3 filter_normal(vec2 uv, float texel_size)
+vec3 filter_normal(vec2 uv, float texel_size, float ampl)
 {
 	vec4 h;
 	ivec2 off1 = ivec2(10, 0);
 	ivec2 off2 = ivec2(-10, 0);
-	h.x = amplitude * textureOffset(heightmap, uv * texel_size, off2.yx).r;
-	h.y = amplitude * textureOffset(heightmap, uv * texel_size, off2.xy).r;
-	h.z = amplitude * textureOffset(heightmap, uv * texel_size, off1.xy).r;
-	h.w = amplitude * textureOffset(heightmap, uv * texel_size, off1.yx).r;
+	h.x = (1.0 + mask) * ampl * textureOffset(heightmap, uv * texel_size, off2.yx).r;
+	h.y = (1.0 + mask) * ampl * textureOffset(heightmap, uv * texel_size, off2.xy).r;
+	h.z = (1.0 + mask) * ampl * textureOffset(heightmap, uv * texel_size, off1.xy).r;
+	h.w = (1.0 + mask) * ampl * textureOffset(heightmap, uv * texel_size, off1.yx).r;
 	vec3 n;
 	n.z = h.x - h.w;
 	n.x = h.y - h.z;
@@ -68,17 +70,24 @@ vec3 filter_normal(vec2 uv, float texel_size)
 
 void main(void)
 {
+	float amplitude = 8.0;
 	gl_Position = (gl_TessCoord.x * gl_in[0].gl_Position +
 			gl_TessCoord.y * gl_in[1].gl_Position +
 			gl_TessCoord.z * gl_in[2].gl_Position);
 
 	uv = gl_Position.xz;
 	height = texture(heightmap, uv * 0.015625).r;
-	bump = filter_normal(uv, 0.015625);
+	mask = texture(range, uv * 0.015625).r;
+//	mask = mask * mask;
+	mask = mask * height;
+	if (height < 0.58) {
+		mask  = mask * pow(2.0, height * height * height * height);
+	}
+
 	vec3 newpos = gl_Position.xyz;
-	newpos.y = amplitude * height;
+	bump = filter_normal(uv, 0.015625, amplitude);
+	newpos.y = amplitude * (1.0 + mask) * height;
 	fpos = newpos;
-	//gl_Position.y *= amplitude;
 	gl_Position = project * view * vec4(newpos, 1.0);
 }
 

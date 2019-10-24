@@ -21,9 +21,10 @@ static SDL_GLContext init_glcontext(SDL_Window *window);
 static GLuint dotVAO;
 static GLuint dot_shader;
 static vec3 box_velocity = {0.0};
-static vec3 box_destination;
+static vec3 box_destination = {0.0};
 static vec3 box_rotation = {0.0};
 static SDL_Event event;
+static GLuint mountain_range;
 	
 struct object {
 	struct mesh m;
@@ -320,6 +321,8 @@ struct terrain make_terrain(GLuint heightmap)
 	glUseProgram(ter.shader);
 	glUniformMatrix4fv(glGetUniformLocation(ter.shader, "project"), 1, GL_FALSE, project.f);
 
+	mountain_range = load_dds_texture("data/texture/mountains.dds");
+
 	return ter;
 }
 
@@ -350,6 +353,10 @@ void display_terrain(struct terrain *ter)
 	glUniform1i(glGetUniformLocation(ter->shader, "voronoi"), 5);
 	glActiveTexture(GL_TEXTURE5);
 	glBindTexture(GL_TEXTURE_2D, ter->texture[4]);
+
+	glUniform1i(glGetUniformLocation(ter->shader, "range"), 6);
+	glActiveTexture(GL_TEXTURE6);
+	glBindTexture(GL_TEXTURE_2D, mountain_range);
 
 	glBindVertexArray(ter->surface_mesh.VAO);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -394,6 +401,7 @@ void update_context(struct context *context)
 	}
 
 	update_free_camera(&context->camera, context->delta);
+	//update_strategy_camera(&context->camera, context->delta);
 	mat4 view = make_view_matrix(context->camera.eye, context->camera.center, context->camera.up);
 	mat4 skybox_view = view;
 	skybox_view.f[12] = 0.0;

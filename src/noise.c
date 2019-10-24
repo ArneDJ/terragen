@@ -65,6 +65,7 @@ float fbm_noise(float x, float y, float freq, float lacun, float gain)
 	float ampl = 1.0;
 
 	for (int i = 0; i < OCTAVES; i++) {
+		//n += ampl * ((1.0 - fabs(noise(x*freq, y*freq))) * 2.0 - 1.0);
 		n += ampl * fabs(noise(x*freq, y*freq));
 		div += 256 * ampl;
 		x *= lacun; 
