@@ -4,11 +4,12 @@
 #include <math.h>
 #include <string.h>
 #include "gmath.h"
+#include "noise.h"
 
 #define OCTAVES 6
 #define N_SITES 150
+#define N_CELLS 1000
 #define AA_RES 4 /* average over 4x4 supersampling grid */
-#define frand(x) (rand() / (1. + RAND_MAX) * x)
 
 static int SEED;
 static int hash[] = {
@@ -27,8 +28,9 @@ static int hash[] = {
 };
 
 static double site[N_SITES][2];
-static unsigned char rgb[N_SITES][3];
+static unsigned char rgb_v[N_SITES][3];
 static int size_x = 1024, size_y = 1024;
+vec2 cells[N_CELLS];
  
 static inline int permutation(int x, int y)
 {
@@ -122,14 +124,69 @@ static void aa_color(unsigned char *pix, int y, int x)
 		for (j = 0; j < AA_RES; j++) {
 			xx = x + 1. / AA_RES * j + .5;
 			n = nearest_site(xx, yy);
-			r += rgb[n][0];
-			g += rgb[n][1];
-			b += rgb[n][2];
+			r += rgb_v[n][0];
+			g += rgb_v[n][1];
+			b += rgb_v[n][2];
 		}
 	}
 	pix[0] = r / (AA_RES * AA_RES);
 	pix[1] = g / (AA_RES * AA_RES);
 	pix[2] = b / (AA_RES * AA_RES);
+}
+
+// Determines how many cells there are
+#define NUM_CELLS 8.0
+
+// Arbitrary random, can be replaced with a function of your choice
+float randv(vec2 co)
+{
+	vec2 xy = {co.y, co.x};
+	vec2 r = {12.9898, 78.233};
+	return fract(sin(vec2_dot(xy ,r)) * 43758.5453);
+}
+
+float vec2_dist(vec2 a, vec2 b)
+{
+	return sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
+}
+
+float vec2_length(vec2 v)
+{
+	return sqrt(v.x * v.x + v.y * v.y);
+}
+
+// Returns the point in a given cell
+vec2 get_cell_point(vec2 cell) {
+	vec2 cell_base = {cell.x / NUM_CELLS, cell.y / NUM_CELLS};
+	float noise_x = randv(cell);
+	vec2 yx = {cell.y, cell.x};
+	float noise_y = randv(yx);
+	vec2 noise = {0.5 + 1.5 * noise_x, 0.5 + 1.5 * noise_y};
+	vec2 point = {cell_base.x + noise.x / NUM_CELLS, cell_base.y + noise.y / NUM_CELLS};
+	return point;
+}
+
+float worley_noise(float x, float y) 
+{
+	int xcoord = x * NUM_CELLS;
+	int ycoord = y * NUM_CELLS;
+	float dist = 1.0;
+	vec2 coordv = {x, y};
+
+	// Search in the surrounding 5x5 cell block
+	for (int x = 0; x < 5; x++) {
+		for (int y = 0; y < 5; y++) {
+			vec2 cell = {xcoord + (x - 2), ycoord + (y - 2)};
+			vec2 cell_point = get_cell_point(cell);
+			dist = min(dist, vec2_dist(cell_point, coordv));
+
+		}
+	}
+
+	vec2 len = {1.0 / NUM_CELLS, 1.0 / NUM_CELLS};
+	dist /= vec2_length(len);
+	//dist = 1.0 - sqrt(dist);
+	return dist;
 }
 
 unsigned char *gen_voronoi_map()
@@ -138,9 +195,9 @@ unsigned char *gen_voronoi_map()
 	for (k = 0; k < N_SITES; k++) {
 		site[k][0] = frand(size_x);
 		site[k][1] = frand(size_y);
-		rgb[k][0] = frand(256);
-		rgb[k][1] = frand(256);
-		rgb[k][2] = frand(256);
+		rgb_v[k][0] = frand(256);
+		rgb_v[k][1] = frand(256);
+		rgb_v[k][2] = frand(256);
 	}
 
 	int i, j;
@@ -157,7 +214,7 @@ unsigned char *gen_voronoi_map()
 	for (i = 0; i < size_y; i++) {
 		for (j = 0; j < size_x; j++) {
 			if (!at_edge(nearest, i, j))
-				memcpy(ptr, rgb[nearest[i * size_x + j]], 3);
+				memcpy(ptr, rgb_v[nearest[i * size_x + j]], 3);
 			else /* at edge, do anti-alias rastering */
 				aa_color(ptr, i, j);
 			ptr += 3;
@@ -166,7 +223,7 @@ unsigned char *gen_voronoi_map()
  
 	/* draw sites */
 	for (k = 0; k < N_SITES; k++) {
-		color = (rgb[k][0]*.25 + rgb[k][1]*.6 + rgb[k][2]*.15 > 80) ? 0 : 255;
+		color = (rgb_v[k][0]*.25 + rgb_v[k][1]*.6 + rgb_v[k][2]*.15 > 80) ? 0 : 255;
 
 		for (i = site[k][1] - 1; i <= site[k][1] + 1; i++) {
 			if (i < 0 || i >= size_y) 
@@ -185,17 +242,74 @@ unsigned char *gen_voronoi_map()
 	return buf;
 }
 
+static inline float my_worley(float x, float y)
+{
+	float min = 1024;
+	float d;
+	for (int i = 0; i < N_CELLS; i++) {
+		d = sqrt(sq2(x - cells[i].x, y - cells[i].y));				
+		min = min(d, min);
+	}
+	return min;
+}
 
+unsigned char *gen_worley_map()
+{
+	unsigned char *buf = calloc(3 * 1024*1024, sizeof(unsigned char));
+	float z[size_x*size_y];
+	
+	for (int i = 0; i < N_CELLS; i++) {
+		cells[i].x = frand(1024);
+		cells[i].y = frand(1024);
+	}
 
+	clock_t t;
+	t = clock();
+	printf("brute forcing: starts\n");
 
+	float max = 0;
+	int npixel = 0;
+	for(int x = 0; x < size_x; x++) {
+		for(int y = 0; y < size_y; y++) {
+			z[npixel] = my_worley(x, y);
+			max = max(max, z[npixel]);
+			npixel++;
+		}
+	}
+
+	t = clock() - t;
+	double time_taken = ((double)t)/CLOCKS_PER_SEC; // calculate the elapsed time
+	printf("The brute force took %lf seconds to execute\n", time_taken);
+
+	int nbuf = 0;
+	for (int i = 0; i < size_x * size_y; i++) {
+		z[i] /= max;
+		//z[i] = 1.0 - sqrt(z[i]); //if you want steep mountains
+		z[i] = 1.0 - z[i]; //if you want normal mountains
+
+		buf[nbuf++] = 255*z[i]; buf[nbuf++] = 255*z[i]; buf[nbuf++] = 255*z[i];
+	}
+
+	return buf;
+}
 
 
 float fbm_map_value(float x, float y, float freq, float lacun, float gain)
 {
 	float noise = fbm_noise(x, y, freq, lacun, gain);
-	if (noise > 0.58)	
-		noise = lerp(0.37, 0.75, noise);
+	//if (noise > 0.58)	
+	 	//noise = lerp(0.37, 0.75, noise);
 
-	return noise;
+	float wor = worley_noise(x * 0.003, y * 0.003);
+	wor = lerp(0.5, 1.0, wor);
+	float rigid = worley_noise(x * 0.001, y * 0.001);
+	rigid = 1.0 - rigid;
+	rigid = lerp(0.5, 1.0, rigid);
+
+	wor *= noise * pow(wor, noise);
+	rigid *= noise * pow(rigid, noise);
+	noise += wor + rigid;
+
+	return noise / 2.1;
 }
 

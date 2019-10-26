@@ -1,11 +1,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include <GL/glew.h>
 #include <GL/gl.h>
 #include "texture.h"
-#include "noise.h"
 #include "gmath.h"
+#include "noise.h"
 
 GLuint load_dds_texture(const char *fpath) 
 {
@@ -145,4 +146,33 @@ GLuint make_voronoi_texture(void)
 
 	return texnum;
 }
+
+GLuint make_worley_texture(void)
+{
+	GLuint texnum;
+	size_t len = 1024 * 1024;
+	unsigned char *buf = gen_worley_map();
+	rgb *image = calloc(len, sizeof(rgb));
+	int nbuf = 0;
+	for (int i = 0; i < len; i++) {
+		image[i][0] = buf[nbuf++];
+		image[i][1] = buf[nbuf++];
+		image[i][2] = buf[nbuf++];
+	}
+
+	glGenTextures(1, &texnum);
+	glBindTexture(GL_TEXTURE_2D, texnum);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 1024, 1024);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1024, 1024, GL_RGB, GL_UNSIGNED_BYTE, image[0]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	free(buf);
+	free(image);
+
+	return texnum;
+}
+
+
 

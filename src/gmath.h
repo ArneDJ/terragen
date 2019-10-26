@@ -1,6 +1,7 @@
 #define IDENTITY_MATRIX {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
+#define frand(x) (rand() / (1. + RAND_MAX) * x)
 
 typedef union {
 	float f[2]; struct { float x, y; };

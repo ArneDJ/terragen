@@ -56,10 +56,10 @@ vec3 filter_normal(vec2 uv, float texel_size, float ampl)
 	vec4 h;
 	ivec2 off1 = ivec2(10, 0);
 	ivec2 off2 = ivec2(-10, 0);
-	h.x = (1.0 + mask) * ampl * textureOffset(heightmap, uv * texel_size, off2.yx).r;
-	h.y = (1.0 + mask) * ampl * textureOffset(heightmap, uv * texel_size, off2.xy).r;
-	h.z = (1.0 + mask) * ampl * textureOffset(heightmap, uv * texel_size, off1.xy).r;
-	h.w = (1.0 + mask) * ampl * textureOffset(heightmap, uv * texel_size, off1.yx).r;
+	h.x = ampl * textureOffset(heightmap, uv * texel_size, off2.yx).r;
+	h.y = ampl * textureOffset(heightmap, uv * texel_size, off2.xy).r;
+	h.z = ampl * textureOffset(heightmap, uv * texel_size, off1.xy).r;
+	h.w = ampl * textureOffset(heightmap, uv * texel_size, off1.yx).r;
 	vec3 n;
 	n.z = h.x - h.w;
 	n.x = h.y - h.z;
@@ -78,15 +78,16 @@ void main(void)
 	uv = gl_Position.xz;
 	height = texture(heightmap, uv * 0.015625).r;
 	mask = texture(range, uv * 0.015625).r;
-//	mask = mask * mask;
-	mask = mask * height;
-	if (height < 0.58) {
-		mask  = mask * pow(2.0, height * height * height * height);
-	}
+
+//	mask = mask * height * pow(2.0, pow(height, 4.0));
+//	mask *= height * pow(height, height);
+//	mask *= height * pow(mask, height);
+//	mask *= height;
+//	height *= 1.0 + mask;
 
 	vec3 newpos = gl_Position.xyz;
 	bump = filter_normal(uv, 0.015625, amplitude);
-	newpos.y = amplitude * (1.0 + mask) * height;
+	newpos.y = amplitude * height;
 	fpos = newpos;
 	gl_Position = project * view * vec4(newpos, 1.0);
 }
