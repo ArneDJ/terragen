@@ -321,7 +321,7 @@ struct terrain make_terrain(GLuint heightmap)
 	glUseProgram(ter.shader);
 	glUniformMatrix4fv(glGetUniformLocation(ter.shader, "project"), 1, GL_FALSE, project.f);
 
-	//mountain_range = make_worley_texture();
+	mountain_range = load_dds_texture("data/texture/mountains.dds");
 
 	return ter;
 }

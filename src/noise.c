@@ -6,7 +6,7 @@
 #include "gmath.h"
 #include "noise.h"
 
-#define OCTAVES 6
+#define OCTAVES 5
 #define N_SITES 150
 #define N_CELLS 1000
 #define AA_RES 4 /* average over 4x4 supersampling grid */
@@ -293,23 +293,47 @@ unsigned char *gen_worley_map()
 	return buf;
 }
 
-
 float fbm_map_value(float x, float y, float freq, float lacun, float gain)
 {
 	float noise = fbm_noise(x, y, freq, lacun, gain);
-	//if (noise > 0.58)	
-	 	//noise = lerp(0.37, 0.75, noise);
 
-	float wor = worley_noise(x * 0.003, y * 0.003);
-	wor = lerp(0.5, 1.0, wor);
-	float rigid = worley_noise(x * 0.001, y * 0.001);
-	rigid = 1.0 - rigid;
-	rigid = lerp(0.5, 1.0, rigid);
+	if (noise > 0.58)	
+	 	noise = lerp(0.37, 0.75, noise);
+
+	//float mountains = 0.1 * fabs(sin(0.5*y)) + 0.9;
+	float mountains = 0.1 * worley_noise(0.003*x, 0.003*y) + 0.9;
+	mountains *= noise * pow(mountains, noise); // correction so mountains don't spawn in seas
+	float range = sin(0.01*x);
+	range = clamp(range, 0.0, 1.0);
+	mountains *= range;
+	mountains = mountains * 0.25;
+
+	return noise + mountains;
+}
+
+/*
+float fbm_map_value(float x, float y, float freq, float lacun, float gain)
+{
+	float noise = fbm_noise(x, y, freq, lacun, gain);
+
+	float rigid =  0.125 * worley_noise(x * 0.003, y * 0.003) + 0.875;
+	if (rigid < 0.75) {
+		printf("sneed\n");
+	}
+	//rigid = lerp(0.5, 1.0, rigid);
+	float wor = 0.25 * (1.0 - worley_noise(x * 0.005, y * 0.005)) + 0.75;
+	//wor = lerp(0.5, 1.0, wor);
+
+	float range = 2.0 * sin(0.02*x);
+	range = clamp(range, 0.0, 1.0);
 
 	wor *= noise * pow(wor, noise);
 	rigid *= noise * pow(rigid, noise);
-	noise += wor + rigid;
 
-	return noise / 2.1;
+	if (noise > 0.58)	
+	 	noise = lerp(0.37, 0.75, noise);
+
+	return wor * rigid;
 }
+*/
 
