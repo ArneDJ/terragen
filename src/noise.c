@@ -300,15 +300,21 @@ float fbm_map_value(float x, float y, float freq, float lacun, float gain)
 	if (noise > 0.58)	
 	 	noise = lerp(0.37, 0.75, noise);
 
-	//float mountains = 0.1 * fabs(sin(0.5*y)) + 0.9;
-	float mountains = 0.1 * worley_noise(0.003*x, 0.003*y) + 0.9;
+	float mountains = 0.5 * (1.0 - worley_noise(0.002*x, 0.002*y)); //this should always be between 0 an 1
 	mountains *= noise * pow(mountains, noise); // correction so mountains don't spawn in seas
-	float range = sin(0.01*x);
-	range = clamp(range, 0.0, 1.0);
-	mountains *= range;
-	mountains = mountains * 0.25;
+	float ridge = 2.0 *  worley_noise(x * 0.003, y * 0.003);
+	ridge *= noise * pow(ridge, noise); 
 
-	return noise + mountains;
+	float range = 5.0 * sin(0.01*x); // sigmoid correction so mountains and terrain transition appears steep
+	range = clamp(range, 0.0, 1.0);
+
+	mountains *= range;
+	mountains *= 0.25;
+
+	ridge *= range;
+	ridge *= 0.25;
+
+	return clamp(noise + ridge + mountains, 0.0, 0.99); //this should always return something between 0 and 1
 }
 
 /*
