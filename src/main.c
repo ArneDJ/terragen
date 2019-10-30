@@ -25,6 +25,7 @@ static vec3 box_destination = {0.0};
 static vec3 box_rotation = {0.0};
 static SDL_Event event;
 static GLuint mountain_range;
+static GLuint terrain_heightmap;
 	
 struct object {
 	struct mesh m;
@@ -91,7 +92,8 @@ struct map make_map(void)
 	};
 	map.shader = load_shaders(pipeline);
 
-	map.texture = make_voronoi_texture();
+	//map.texture = make_voronoi_texture();
+	map.texture = terrain_heightmap;
 
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(map.shader);
@@ -382,6 +384,7 @@ void display_scene(struct scene *scene)
 void load_scene(struct scene *scene)
 {
 	scene->heightmap = make_heightmap_texture();
+	terrain_heightmap = scene->heightmap;
 
 	scene->skybox = make_skybox();
 	scene->terrain = make_terrain(scene->heightmap);
@@ -400,8 +403,8 @@ void update_context(struct context *context)
 		context->camera.speed = 4.0;
 	}
 
-	update_free_camera(&context->camera, context->delta);
-	//update_strategy_camera(&context->camera, context->delta);
+	//update_free_camera(&context->camera, context->delta);
+	update_strategy_camera(&context->camera, context->delta);
 	mat4 view = make_view_matrix(context->camera.eye, context->camera.center, context->camera.up);
 	mat4 skybox_view = view;
 	skybox_view.f[12] = 0.0;

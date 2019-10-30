@@ -295,7 +295,7 @@ unsigned char *gen_worley_map()
 
 float fbm_map_value(float x, float y, float freq, float lacun, float gain)
 {
-	float noise = fbm_noise(x, y, freq, lacun, gain);
+	float noise = fbm_noise(0.5*x, 0.5*y, freq, lacun, gain);
 
 	if (noise > 0.58)	
 	 	noise = lerp(0.37, 0.75, noise);
@@ -303,9 +303,12 @@ float fbm_map_value(float x, float y, float freq, float lacun, float gain)
 	float mountains = 0.5 * (1.0 - worley_noise(0.002*x, 0.002*y)); //this should always be between 0 an 1
 	mountains *= noise * pow(mountains, noise); // correction so mountains don't spawn in seas
 	float ridge = 2.0 *  worley_noise(x * 0.003, y * 0.003);
+	ridge = clamp(ridge, 0.7, 2.0); // optional
 	ridge *= noise * pow(ridge, noise); 
 
-	float range = 5.0 * sin(0.01*x); // sigmoid correction so mountains and terrain transition appears steep
+	float range = fbm_noise(x*1.0, y*1.5, freq, lacun, gain);
+	range = smoothstep(0.5, 0.8, range); // sigmoid correction so mountains and terrain transition appears smooth
+
 	range = clamp(range, 0.0, 1.0);
 
 	mountains *= range;
@@ -316,30 +319,3 @@ float fbm_map_value(float x, float y, float freq, float lacun, float gain)
 
 	return clamp(noise + ridge + mountains, 0.0, 0.99); //this should always return something between 0 and 1
 }
-
-/*
-float fbm_map_value(float x, float y, float freq, float lacun, float gain)
-{
-	float noise = fbm_noise(x, y, freq, lacun, gain);
-
-	float rigid =  0.125 * worley_noise(x * 0.003, y * 0.003) + 0.875;
-	if (rigid < 0.75) {
-		printf("sneed\n");
-	}
-	//rigid = lerp(0.5, 1.0, rigid);
-	float wor = 0.25 * (1.0 - worley_noise(x * 0.005, y * 0.005)) + 0.75;
-	//wor = lerp(0.5, 1.0, wor);
-
-	float range = 2.0 * sin(0.02*x);
-	range = clamp(range, 0.0, 1.0);
-
-	wor *= noise * pow(wor, noise);
-	rigid *= noise * pow(rigid, noise);
-
-	if (noise > 0.58)	
-	 	noise = lerp(0.37, 0.75, noise);
-
-	return wor * rigid;
-}
-*/
-

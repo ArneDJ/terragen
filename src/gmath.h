@@ -62,6 +62,7 @@ struct OBB {
 float lerp(float a, float b, float t);
 float fract(float x);
 float clamp(float n, float min, float max);
+float smoothstep(float edge0, float edge1, float x);
 
 float vec2_dot(vec2 a, vec2 b);
 
