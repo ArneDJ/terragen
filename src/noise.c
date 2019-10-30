@@ -7,12 +7,11 @@
 #include "noise.h"
 
 #define OCTAVES 5
-#define N_SITES 150
-#define N_CELLS 1000
-#define AA_RES 4 /* average over 4x4 supersampling grid */
-
 static int SEED;
-static int hash[] = {
+
+static inline int permutation(int x, int y)
+{
+	const int hash_table[] = {
 	208,34,231,213,32,248,233,56,161,78,24,140,71,48,140,254,245,255,247,247,40,
 	185,248,251,245,28,124,204,204,76,36,1,107,28,234,163,202,224,245,128,167,204,
 	9,92,217,54,239,174,173,102,193,189,190,121,100,108,167,44,43,77,180,204,8,81,
@@ -25,17 +24,9 @@ static int hash[] = {
 	101,120,99,3,186,86,99,41,237,203,111,79,220,135,158,42,30,154,120,67,87,167,
 	135,176,183,191,253,115,184,21,233,58,129,233,142,39,128,211,118,137,139,255,
 	114,20,218,113,154,27,127,246,250,1,8,198,250,209,92,222,173,21,88,102,219
-};
-
-static double site[N_SITES][2];
-static unsigned char rgb_v[N_SITES][3];
-static int size_x = 1024, size_y = 1024;
-vec2 cells[N_CELLS];
- 
-static inline int permutation(int x, int y)
-{
-	int tmp = hash[(y + SEED) % 256];
-	return hash[(tmp + x) % 256];
+	};
+	int tmp = hash_table[(y + SEED) % 256];
+	return hash_table[(tmp + x) % 256];
 }
 
 static inline float smooth(float x, float y, float s)
@@ -43,7 +34,7 @@ static inline float smooth(float x, float y, float s)
 	return lerp(x, y, s * s * (3-2*s));
 }
 
-static float noise(float x, float y)
+static inline float noise(float x, float y)
 {
 	int ix = x;
 	int iy = y;
@@ -78,6 +69,20 @@ float fbm_noise(float x, float y, float freq, float lacun, float gain)
 	return n /= div;
 }
 
+
+
+
+
+
+#define N_SITES 150
+#define N_CELLS 1000
+#define AA_RES 4 /* average over 4x4 supersampling grid */
+
+static double site[N_SITES][2];
+static unsigned char rgb_v[N_SITES][3];
+static int size_x = 1024, size_y = 1024;
+vec2 cells[N_CELLS];
+ 
 static inline double sq2(double x, double y)
 {
 	return x * x + y * y;
@@ -95,7 +100,7 @@ static int nearest_site(double x, double y)
 	}
 	return ret;
 }
- 
+
 /* see if a pixel is different from any neighboring ones */
 static int at_edge(int *color, int y, int x)
 {
@@ -293,29 +298,3 @@ unsigned char *gen_worley_map()
 	return buf;
 }
 
-float fbm_map_value(float x, float y, float freq, float lacun, float gain)
-{
-	float noise = fbm_noise(0.5*x, 0.5*y, freq, lacun, gain);
-
-	if (noise > 0.58)	
-	 	noise = lerp(0.37, 0.75, noise);
-
-	float mountains = 0.5 * (1.0 - worley_noise(0.002*x, 0.002*y)); //this should always be between 0 an 1
-	mountains *= noise * pow(mountains, noise); // correction so mountains don't spawn in seas
-	float ridge = 2.0 *  worley_noise(x * 0.003, y * 0.003);
-	ridge = clamp(ridge, 0.7, 2.0); // optional
-	ridge *= noise * pow(ridge, noise); 
-
-	float range = fbm_noise(x*1.0, y*1.5, freq, lacun, gain);
-	range = smoothstep(0.5, 0.8, range); // sigmoid correction so mountains and terrain transition appears smooth
-
-	range = clamp(range, 0.0, 1.0);
-
-	mountains *= range;
-	mountains *= 0.25;
-
-	ridge *= range;
-	ridge *= 0.25;
-
-	return clamp(noise + ridge + mountains, 0.0, 0.99); //this should always return something between 0 and 1
-}

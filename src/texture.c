@@ -90,32 +90,22 @@ GLuint load_dds_texture(const char *fpath)
 	return texnum;
 }
 
-GLuint make_heightmap_texture(void)
+
+
+
+
+GLuint make_rgb_texture(rgb *image, int width, int height)
 {
 	GLuint texnum;
-	const size_t len = 1024 * 1024;
-	rgb *image = calloc(len, sizeof(rgb));
-
-	int n = 0;
-	for (int y = 0; y < 1024; y++) {
-		for (int x = 0; x < 1024; x++) {
-			float z = fbm_map_value(x, y, 0.004, 2.5, 2.0);
-			image[n][0] = 256 * z;
-			image[n][1] = 256 * z;
-			image[n][2] = 256 * z;
-			n++;
-		}
-	}
 
 	glGenTextures(1, &texnum);
 	glBindTexture(GL_TEXTURE_2D, texnum);
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, 1024, 1024);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1024, 1024, GL_RGB, GL_UNSIGNED_BYTE, image[0]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, width, height);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, image);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
-	free(image);
 
 	return texnum;
 }
@@ -133,14 +123,8 @@ GLuint make_voronoi_texture(void)
 		image[i][2] = buf[nbuf++];
 	}
 
-	glGenTextures(1, &texnum);
-	glBindTexture(GL_TEXTURE_2D, texnum);
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 1024, 1024);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1024, 1024, GL_RGB, GL_UNSIGNED_BYTE, image[0]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	texnum = make_rgb_texture(image, 1024, 1024);
 
-	glBindTexture(GL_TEXTURE_2D, 0);
 	free(buf);
 	free(image);
 
@@ -160,14 +144,8 @@ GLuint make_worley_texture(void)
 		image[i][2] = buf[nbuf++];
 	}
 
-	glGenTextures(1, &texnum);
-	glBindTexture(GL_TEXTURE_2D, texnum);
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 1024, 1024);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1024, 1024, GL_RGB, GL_UNSIGNED_BYTE, image[0]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	texnum = make_rgb_texture(image, 1024, 1024);
 
-	glBindTexture(GL_TEXTURE_2D, 0);
 	free(buf);
 	free(image);
 

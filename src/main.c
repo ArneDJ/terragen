@@ -26,6 +26,33 @@ static vec3 box_rotation = {0.0};
 static SDL_Event event;
 static GLuint mountain_range;
 static GLuint terrain_heightmap;
+
+float terrain_height(float x, float y, float freq, float lacun, float gain)
+{
+	float noise = fbm_noise(0.5*x, 0.5*y, freq, lacun, gain);
+
+	if (noise > 0.58)	
+	 	noise = lerp(0.37, 0.75, noise);
+
+	float mountains = 0.5 * (1.0 - worley_noise(0.002*x, 0.002*y)); //this should always be between 0 an 1
+	mountains *= noise * pow(mountains, noise); // correction so mountains don't spawn in seas
+	float ridge = 2.0 *  worley_noise(x * 0.003, y * 0.003);
+	ridge = clamp(ridge, 0.7, 2.0); // optional
+	ridge *= noise * pow(ridge, noise); 
+
+	float range = fbm_noise(x*1.0, y*1.5, freq, lacun, gain);
+	range = smoothstep(0.65, 0.8, range); // sigmoid correction so mountains and terrain transition appears smooth
+
+	range = clamp(range, 0.0, 1.0);
+
+	mountains *= range;
+	mountains *= 0.25;
+
+	ridge *= range;
+	ridge *= 0.25;
+
+	return clamp(noise + ridge + mountains, 0.0, 0.99); //this should always return something between 0 and 1
+}
 	
 struct object {
 	struct mesh m;
@@ -105,7 +132,7 @@ struct map make_map(void)
 static vec3 sample_height(float x, float z)
 {
 	float amplitude = 8.0;
-	return vec3_make(x, amplitude * fbm_map_value(x*16, z*16, 0.004, 2.5, 2.0), z);
+	return vec3_make(x, amplitude * terrain_height(x*16, z*16, 0.004, 2.5, 2.0), z);
 }
 
 void make_terrain_surface(struct terrain *terra)
@@ -383,7 +410,22 @@ void display_scene(struct scene *scene)
 
 void load_scene(struct scene *scene)
 {
-	scene->heightmap = make_heightmap_texture();
+	const size_t len = 1024 * 1024;
+	rgb *image = calloc(len, sizeof(rgb));
+
+	int n = 0;
+	for (int y = 0; y < 1024; y++) {
+		for (int x = 0; x < 1024; x++) {
+			float z = terrain_height(x, y, 0.004, 2.5, 2.0);
+			image[n][0] = 256 * z;
+			image[n][1] = 256 * z;
+			image[n][2] = 256 * z;
+			n++;
+		}
+	}
+	scene->heightmap = make_rgb_texture(image, 1024, 1024);
+	free(image);
+
 	terrain_heightmap = scene->heightmap;
 
 	scene->skybox = make_skybox();
@@ -403,8 +445,8 @@ void update_context(struct context *context)
 		context->camera.speed = 4.0;
 	}
 
-	//update_free_camera(&context->camera, context->delta);
-	update_strategy_camera(&context->camera, context->delta);
+	update_free_camera(&context->camera, context->delta);
+	//update_strategy_camera(&context->camera, context->delta);
 	mat4 view = make_view_matrix(context->camera.eye, context->camera.center, context->camera.up);
 	mat4 skybox_view = view;
 	skybox_view.f[12] = 0.0;
