@@ -69,6 +69,51 @@ float fbm_noise(float x, float y, float freq, float lacun, float gain)
 	return n /= div;
 }
 
+static inline float mod(float x, float y)
+{
+	return x - y * floorf(x/y);
+}
+
+static inline vec4 permute(vec4 v)
+{
+	vec4 tmp = {
+		mod((34.0 * v.x + 1.0) * v.x, 289.0), 
+		mod((34.0 * v.y + 1.0) * v.y, 289.0), 
+		mod((34.0 * v.z + 1.0) * v.z, 289.0), 
+		mod((34.0 * v.w + 1.0) * v.w, 289.0)
+	};
+	return tmp;
+}
+
+float worley_noise(float x, float y)
+{
+	const float K = 1.0/7.0;
+	const float K2 = 0.5/7.0;
+	const float jitter = 0.8; // jitter 1.0 makes F1 wrong more often
+
+	vec2 Pi = {mod(floor(x), 289.0), mod(floor(y), 289.0)};
+	vec2 Pf = {fract(x), fract(y)};
+	vec4 Pfx = {Pf.x - 0.5, Pf.x - 1.5, Pf.x - 0.5, Pf.x - 1.5};
+	vec4 Pfy = {Pf.y - 0.5, Pf.y - 0.5, Pf.y - 1.5, Pf.y - 1.5};
+
+	vec4 p = {Pi.x + 0.0, Pi.x + 1.0, Pi.x + 0.0, Pi.x + 1.0};
+	p = permute(p);
+	vec4 pp = {p.x + Pi.y + 0.0, p.y + Pi.y + 0.0, p.z + Pi.y + 1.0, p.w + Pi.y + 1.0};
+	p = permute(pp);
+	vec4 ox = {mod(p.x, 7.0) * K + K2, mod(p.y, 7.0) * K + K2, mod(p.z, 7.0) * K + K2, mod(p.w, 7.0) * K + K2};
+	vec4 oy = {mod(floor(p.x * K) ,7.0) * K + K2, mod(floor(p.y * K) ,7.0) * K + K2, mod(floor(p.z * K) ,7.0) * K + K2, mod(floor(p.w * K) ,7.0) * K + K2};
+	vec4 dx = {Pfx.x + jitter * ox.x, Pfx.y + jitter * ox.y, Pfx.z + jitter * ox.z, Pfx.w + jitter * ox.w};
+	vec4 dy = {Pfy.x + jitter * oy.x, Pfy.y + jitter * oy.y, Pfy.z + jitter * oy.z, Pfy.w + jitter * oy.w};
+	vec4 d = {dx.x * dx.x + dy.x * dy.x, dx.y * dx.y + dy.y * dy.y, dx.z * dx.z + dy.z * dy.z, dx.w * dx.w + dy.w * dy.w}; // d i s t a n c e s squared
+	// Cheat and pick only F1 for the return value
+	d.x = min(d.x, d.z);
+	d.y = min(d.y, d.w);
+	d.x = min(d.x , d.y);
+	return d.x; // F1 duplicated , F2 not computed
+}
+
+
+
 
 
 
@@ -171,7 +216,8 @@ vec2 get_cell_point(vec2 cell) {
 	return point;
 }
 
-float worley_noise(float x, float y) 
+/* DEPCRECATED: TOO SLOW */
+float old_worley_noise(float x, float y) 
 {
 	int xcoord = x * NUM_CELLS;
 	int ycoord = y * NUM_CELLS;
@@ -246,6 +292,8 @@ unsigned char *gen_voronoi_map()
  
 	return buf;
 }
+
+
 
 static inline float my_worley(float x, float y)
 {

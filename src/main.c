@@ -34,14 +34,14 @@ float terrain_height(float x, float y, float freq, float lacun, float gain)
 	if (noise > 0.58)	
 	 	noise = lerp(0.37, 0.75, noise);
 
-	float mountains = 0.5 * (1.0 - worley_noise(0.002*x, 0.002*y)); //this should always be between 0 an 1
+	float mountains = 0.5 * (1.0 - worley_noise(0.02*x, 0.02*y)); //this should always be between 0 an 1
 	mountains *= noise * pow(mountains, noise); // correction so mountains don't spawn in seas
-	float ridge = 2.0 *  worley_noise(x * 0.003, y * 0.003);
+	float ridge = 2.0 *  sqrt(worley_noise(x * 0.02, y * 0.02));
 	ridge = clamp(ridge, 0.7, 2.0); // optional
 	ridge *= noise * pow(ridge, noise); 
 
 	float range = fbm_noise(x*1.0, y*1.5, freq, lacun, gain);
-	range = smoothstep(0.65, 0.8, range); // sigmoid correction so mountains and terrain transition appears smooth
+	range = smoothstep(0.55, 0.8, range); // sigmoid correction so mountains and terrain transition appears smooth
 
 	range = clamp(range, 0.0, 1.0);
 
@@ -50,6 +50,10 @@ float terrain_height(float x, float y, float freq, float lacun, float gain)
 
 	ridge *= range;
 	ridge *= 0.25;
+
+	if (mountains < 0.0 || ridge < 0.0) {
+		printf("oopsie\n");
+	}
 
 	return clamp(noise + ridge + mountains, 0.0, 0.99); //this should always return something between 0 and 1
 }
