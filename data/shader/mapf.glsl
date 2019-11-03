@@ -21,9 +21,7 @@ vec2 cellular2x2(vec2 P)
 	p = permute ( p + Pi . y + vec4 (0.0 , 0.0 , 1.0 , 1.0) ) ;
 	vec4 ox = mod (p , 7.0) * K + K2 ;
 	vec4 oy = mod ( floor ( p * K ) ,7.0) * K + K2 ;
-	vec4 dx = Pfx + jitter * ox ;
-	vec4 dy = Pfy + jitter * oy ;
-	vec4 d = dx * dx + dy * dy ; // d i s t a n c e s squared
+	vec4 dx = Pfx + jitter * ox ; vec4 dy = Pfy + jitter * oy ; vec4 d = dx * dx + dy * dy ; // d i s t a n c e s squared
 	// Cheat and pick only F1 for the return value
 	d.xy = min ( d.xy , d.zw ) ;
 	d.x = min ( d.x , d.y ) ;
@@ -40,6 +38,7 @@ void main(void)
 	float n = 1.0 - 1.5 * F.x;
 	float blobs = 1.0 - sqrt(F.x);
 	*/
+
 	gl_FragColor = ftexture;
 }
 

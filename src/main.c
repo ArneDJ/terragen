@@ -13,7 +13,8 @@
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 960
 
-#define TERRAIN_WIDTH 64;
+#define TERRAIN_WIDTH 64
+#define HEIGHTMAP_RES 2048
 
 static SDL_Window *init_window(int width, int height);
 static SDL_GLContext init_glcontext(SDL_Window *window);
@@ -31,18 +32,17 @@ float terrain_height(float x, float y, float freq, float lacun, float gain)
 {
 	float noise = fbm_noise(0.5*x, 0.5*y, freq, lacun, gain);
 
-	if (noise > 0.58)	
-	 	noise = lerp(0.37, 0.75, noise);
+	if (noise > 0.48)	
+	 	noise = lerp(0.28, 0.75, noise);
 
-	float mountains = 0.5 * (1.0 - worley_noise(0.02*x, 0.02*y)); //this should always be between 0 an 1
-	mountains *= noise * pow(mountains, noise); // correction so mountains don't spawn in seas
-	float ridge = 2.0 *  sqrt(worley_noise(x * 0.02, y * 0.02));
-	ridge = clamp(ridge, 0.7, 2.0); // optional
+	float mountains = 1.0 * (1.0 - sqrt(worley_noise(0.01*x, 0.015*y))); //this should always be between 0 an 1
+	//mountains *= noise * pow(mountains, noise); // correction so mountains don't spawn in seas
+	mountains *= noise;
+	float ridge = 1.5 *  sqrt(worley_noise(x * 0.015, y * 0.01));
 	ridge *= noise * pow(ridge, noise); 
 
-	float range = fbm_noise(x*1.0, y*1.5, freq, lacun, gain);
-	range = smoothstep(0.55, 0.8, range); // sigmoid correction so mountains and terrain transition appears smooth
-
+	float range = fbm_noise(x*1.5, y*1.5, freq, lacun, gain);
+	range = smoothstep(0.6, 0.8, range); // sigmoid correction so mountains and terrain transition appears smooth
 	range = clamp(range, 0.0, 1.0);
 
 	mountains *= range;
@@ -51,11 +51,8 @@ float terrain_height(float x, float y, float freq, float lacun, float gain)
 	ridge *= range;
 	ridge *= 0.25;
 
-	if (mountains < 0.0 || ridge < 0.0) {
-		printf("oopsie\n");
-	}
-
-	return clamp(noise + ridge + mountains, 0.0, 0.99); //this should always return something between 0 and 1
+	noise = clamp(noise + ridge + mountains, 0.0, 0.99);
+	return noise; //this should always return something between 0 and 1
 }
 	
 struct object {
@@ -414,20 +411,20 @@ void display_scene(struct scene *scene)
 
 void load_scene(struct scene *scene)
 {
-	const size_t len = 1024 * 1024;
+	const size_t len = HEIGHTMAP_RES * HEIGHTMAP_RES;
 	rgb *image = calloc(len, sizeof(rgb));
 
 	int n = 0;
-	for (int y = 0; y < 1024; y++) {
-		for (int x = 0; x < 1024; x++) {
-			float z = terrain_height(x, y, 0.004, 2.5, 2.0);
+	for (int y = 0; y < HEIGHTMAP_RES; y++) {
+		for (int x = 0; x < HEIGHTMAP_RES; x++) {
+			float z = terrain_height(x, y, 0.002, 2.5, 2.0);
 			image[n][0] = 256 * z;
 			image[n][1] = 256 * z;
 			image[n][2] = 256 * z;
 			n++;
 		}
 	}
-	scene->heightmap = make_rgb_texture(image, 1024, 1024);
+	scene->heightmap = make_rgb_texture(image, HEIGHTMAP_RES, HEIGHTMAP_RES);
 	free(image);
 
 	terrain_heightmap = scene->heightmap;
@@ -527,7 +524,7 @@ void run_game(SDL_Window *window)
 	dot_shader = load_shaders(pipeline);
 	struct context context = {0};
 	load_scene(&context.scene);
-	context.camera = init_camera(10.0, 10.0, 10.0, 90.0, 0.2);
+	context.camera = init_camera(10.0, 8.0, 10.0, 90.0, 0.2);
 	float start, end = 0.0;
 
 	float dot[2] = {0.0, 0.0};
