@@ -18,7 +18,7 @@ in float height;
 const vec3 light_dir = vec3(1.0, 1.0, 1.0);
 const float scale = 0.015625;
 
-float orenNayarDiffuse(vec3 lightDirection, vec3 viewDirection, vec3 surfaceNormal, float roughness, float albedo) 
+float orenay(vec3 lightDirection, vec3 viewDirection, vec3 surfaceNormal, float roughness, float albedo) 
 {
 	float LdotV = dot(lightDirection, viewDirection);
 	float NdotL = dot(lightDirection, surfaceNormal);
@@ -43,30 +43,14 @@ float fog(vec3 fpos, vec3 view_pos)
 	return clamp(fog_factor, 0.0, 1.0);
 }
 
-vec3 apply_fog( in vec3  rgb,      // original color of the pixel
-               in float dist, // camera to point distance
-               in vec3  rayDir,   // camera to point vector
-               in vec3  sunDir )  // sun light direction
+vec3 fog(vec3 c, float dist, float height)
 {
-	float b = 0.03;
-    float fogAmount = 1.0 - exp( -dist*b );
-    float sunAmount = max( dot( rayDir, sunDir ), 0.0 );
-    vec3  fogColor  = mix( vec3(0.46, 0.7, 0.99), // bluish
-                           vec3(1.0,0.9,0.7), // yellowish
-                           pow(sunAmount,8.0) );
-    return mix( rgb, fogColor, fogAmount );
-}
-
-vec3 apply_fog_depth( in vec3  rgb,      // original color of the pixel
-               in float dist, // camera to point distance
-               in vec3  rayOri,   // camera position
-               in vec3  rayDir )  // camera to point vector
-{
-float b = 1.0;
-float c = 0.001;
-    float fogAmount = c * exp(-rayOri.y*b) * (1.0-exp( -dist*rayDir.y*b ))/rayDir.y;
-    vec3  fogColor  = vec3(0.46, 0.7, 0.99);
-    return mix(rgb, fogColor, fogAmount);
+	vec3 fog_color = {0.46, 0.7, 0.99};
+	float de = 0.025 * smoothstep(0.0, 3.3, 8.0 - height);
+	float di = 0.045 * smoothstep(0.0, 5.5, 8.0 - height);
+	float extinction = exp(-dist * de);
+	float inscattering = exp(-dist * di);
+	return c * extinction + fog_color * (1.0 - inscattering);
 }
 
 void main(void)
@@ -91,16 +75,14 @@ void main(void)
 
 	vec3 view_dir = normalize(view_eye - fpos);
 
-	float diffuse = orenNayarDiffuse(light_dir, view_dir, bump, 0.5, 1.2);
+	float diffuse = orenay(light_dir, view_dir, bump, 0.5, 1.2);
 	material *= diffuse;
 
 	vec3 fog_color = {0.46, 0.7, 0.99};
 
-	//float fogf = fog(fpos, view_eye);
-	//material = mix(fog_color, material, fogf);
-	vec3 dist = vec3(distance(fpos.x, view_eye.x), distance(fpos.y, view_eye.y), distance(fpos.z, view_eye.z));
-	material = apply_fog(material, length(dist), normalize(fpos.xyz - view_eye), vec3(0.0, -1.0, 0.0));
-	//material = apply_fog_depth(material, length(dist), view_eye, fpos.xyz - view_eye);
+	vec3 view_space = vec3(distance(fpos.x, view_eye.x), distance(fpos.y, view_eye.y), distance(fpos.z, view_eye.z));
+	float dist = length(view_space);
+	material = fog(material, dist, fpos.y);
 
 	gl_FragColor = vec4(material, 1.0);
 }
