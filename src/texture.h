@@ -18,6 +18,8 @@ struct dds {
 
 GLuint load_dds_texture(const char *fpath);
 
+GLuint make_r_texture(unsigned char *image, int width, int height);
+
 GLuint make_rgb_texture(rgb *image, int width, int height);
 
 GLuint make_voronoi_texture(void);

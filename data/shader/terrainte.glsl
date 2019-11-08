@@ -5,13 +5,12 @@ layout(triangles) in;
 uniform sampler2D heightmap;
 uniform sampler2D range;
 uniform mat4 view, project;
+uniform float heightmap_scale = 0.015625;
 
 out vec3 bump;
 out vec3 fpos;
 out vec2 uv;
 out float height;
-
-float mask;
 
 float random(in vec2 st) {
 	return fract(sin(dot(st.xy, vec2(1.9898,78.233)))*43758.5453123);
@@ -51,19 +50,60 @@ float fbm(in vec2 st) {
 	return value;
 }
 
+vec4 permute(vec4 x)
+{
+	return mod ((34.0 * x + 1.0) * x , 289.0) ;
+}
+
+vec2 cellular(vec2 P)
+{
+	const float K = 1.0/7.0;
+	const float K2 = 0.5/7.0;
+	const float jitter = 0.8; // jitter 1.0 makes F1 wrong more often
+	vec2 Pi = mod ( floor ( P ) , 289.0) ;
+	vec2 Pf = fract ( P ) ;
+	vec4 Pfx = Pf . x + vec4 ( -0.5 , -1.5 , -0.5 , -1.5) ;
+	vec4 Pfy = Pf . y + vec4 ( -0.5 , -0.5 , -1.5 , -1.5) ;
+	vec4 p = permute ( Pi . x + vec4 (0.0 , 1.0 , 0.0 , 1.0) ) ;
+	p = permute ( p + Pi . y + vec4 (0.0 , 0.0 , 1.0 , 1.0) ) ;
+	vec4 ox = mod (p , 7.0) * K + K2 ;
+	vec4 oy = mod ( floor ( p * K ) ,7.0) * K + K2 ;
+	vec4 dx = Pfx + jitter * ox ; vec4 dy = Pfy + jitter * oy ; vec4 d = dx * dx + dy * dy ; // d i s t a n c e s squared
+	// Cheat and pick only F1 for the return value
+	d.xy = min ( d.xy , d.zw ) ;
+	d.x = min ( d.x , d.y ) ;
+	return d.xx ; // F1 duplicated , F2 not computed
+}
+
+/* DEPRECATED
 vec3 filter_normal(vec2 uv, float texel_size, float ampl)
 {
 	vec4 h;
-	ivec2 off1 = ivec2(10, 0);
-	ivec2 off2 = ivec2(-10, 0);
-	h.x = ampl * textureOffset(heightmap, uv * texel_size, off2.yx).r;
-	h.y = ampl * textureOffset(heightmap, uv * texel_size, off2.xy).r;
-	h.z = ampl * textureOffset(heightmap, uv * texel_size, off1.xy).r;
-	h.w = ampl * textureOffset(heightmap, uv * texel_size, off1.yx).r;
+	float B = ampl * textureOffset(heightmap, uv * texel_size, ivec2(0, -4)).r;
+	float L = ampl * textureOffset(heightmap, uv * texel_size, ivec2(-4, 0)).r;
+	float R = ampl * textureOffset(heightmap, uv * texel_size, ivec2(4, 0)).r;
+	float T = ampl * textureOffset(heightmap, uv * texel_size, ivec2(0, 4)).r;
 	vec3 n;
-	n.z = h.x - h.w;
-	n.x = h.y - h.z;
-	n.y = 2;
+	n.z = (B - T);
+	n.x = (L - R);
+	n.y = 2.0;
+
+	return normalize(n);
+}
+*/
+
+vec3 filter_normal(vec2 uv, float texel_scale, float amp)
+{
+	const ivec3 offset = ivec3(-1, 0, 1);
+	float delta = 2.0 * amp / textureSize(heightmap, 0 ).x;
+	float left = amp * textureOffset(heightmap, uv * heightmap_scale, offset.xy).r;
+	float right = amp * textureOffset(heightmap, uv * heightmap_scale, offset.zy).r;
+	float top = amp * textureOffset(heightmap, uv * heightmap_scale, offset.yz).r;
+	float bottom = amp * textureOffset(heightmap, uv * heightmap_scale, offset.yx).r;
+
+	vec3 x = normalize( vec3( delta, right - left, 0.0 ) );
+	vec3 z = normalize( vec3( 0.0, top - bottom, delta ) );
+	vec3 n = cross( z, x );
 
 	return normalize(n);
 }
@@ -76,17 +116,10 @@ void main(void)
 			gl_TessCoord.z * gl_in[2].gl_Position);
 
 	uv = gl_Position.xz;
-	height = texture(heightmap, uv * 0.015625).r;
-	mask = texture(range, uv * 0.015625).r;
-
-//	mask = mask * height * pow(2.0, pow(height, 4.0));
-//	mask *= height * pow(height, height);
-//	mask *= height * pow(mask, height);
-//	mask *= height;
-//	height *= 1.0 + mask;
+	height = texture(heightmap, uv * heightmap_scale).r;
 
 	vec3 newpos = gl_Position.xyz;
-	bump = filter_normal(uv, 0.015625, amplitude);
+
 	newpos.y = amplitude * height;
 	fpos = newpos;
 	gl_Position = project * view * vec4(newpos, 1.0);

@@ -6,7 +6,7 @@ uniform vec3 view_dir;
 uniform vec3 view_eye;
 uniform vec3 sunDirection = {1.0, 1.0, 1.0};
 uniform vec3 sunColor = {1.0, 0.5, 0.5};
-uniform vec3 waterColor = {0.0, 0.4, 0.42};
+uniform vec3 waterColor = {0.0, 0.5, 0.52};
 
 in vec3 fpos;
 in vec2 uv;
@@ -20,13 +20,14 @@ void sunLight(const vec3 surfaceNormal, const vec3 eyeDirection, float shiny, fl
     diffuseColor += max(dot(sunDirection, surfaceNormal),0.0)*diffuse;
 }
 
-float fog(vec3 fpos, vec3 view_pos)
+vec3 fog(vec3 c, float dist, float height)
 {
-	vec3 dist = vec3(distance(fpos.x, view_pos.x), distance(fpos.y, view_pos.y), distance(fpos.z, view_pos.z));
-	float z = length(dist);
-	float d = 0.03;
-	float fog_factor = exp(-(d*z)*(d*z));
-	return clamp(fog_factor, 0.0, 1.0);
+	vec3 fog_color = {0.46, 0.7, 0.99};
+	float de = 0.015 * smoothstep(0.0, 3.3, 8.0 - height);
+	float di = 0.015 * smoothstep(0.0, 5.5, 8.0 - height);
+	float extinction = exp(-dist * de);
+	float inscattering = exp(-dist * di);
+	return c * extinction + fog_color * (1.0 - inscattering);
 }
 
 void main(void)
@@ -55,14 +56,18 @@ void main(void)
 
 	float water_depth = 1.0 - terrain_h;
 	//water_depth = clamp(water_depth, 0.6, 1.0);
-	water_depth = smoothstep(0.5, 0.56, water_depth);
+	water_depth = smoothstep(0.5, 0.7, water_depth);
+	vec3 watercolor2 = {0.0, 0.35, 0.36};
+	vec3 material = mix(waterColor, watercolor2, water_depth);
 
-	vec3 material = (diffuse+specular+vec3(0.1))*waterColor;
+	material *= (diffuse+specular);
 
 	vec3 fog_color = {0.46, 0.7, 0.99};
 
-	float fogf = fog(fpos, view_eye);
-	material = mix(fog_color, material, fogf);
+	vec3 view_space = vec3(distance(fpos.x, view_eye.x), distance(fpos.y, view_eye.y), distance(fpos.z, view_eye.z));
+	material = fog(material, length(view_space), fpos.y), 
 
-	gl_FragColor = vec4(material, water_depth);
+	material = pow(material, vec3(1.0/1.5));
+
+	gl_FragColor = vec4(material, 1.0);
 }

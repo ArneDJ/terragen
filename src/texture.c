@@ -110,6 +110,23 @@ GLuint make_rgb_texture(rgb *image, int width, int height)
 	return texnum;
 }
 
+GLuint make_r_texture(unsigned char *image, int width, int height)
+{
+	GLuint texnum;
+
+	glGenTextures(1, &texnum);
+	glBindTexture(GL_TEXTURE_2D, texnum);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_R16, width, height);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RED, GL_UNSIGNED_BYTE, image);
+	// to prevent terrain terracing
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return texnum;
+}
+
 GLuint make_voronoi_texture(void)
 {
 	GLuint texnum;

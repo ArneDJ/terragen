@@ -54,7 +54,7 @@ void update_strategy_camera(struct camera *cam, float delta)
 	if (cam->pitch < -1.57f)	
 		cam->pitch = -1.57f;
 
-	cam->pitch = -0.78f;
+	cam->pitch = -0.95f;
 
 	/* point the camera in a direction based on mouse input */
 	cam->center.x = cos(cam->yaw) * cos(cam->pitch);

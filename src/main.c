@@ -10,8 +10,8 @@
 #include "texture.h"
 #include "noise.h"
 
-#define WINDOW_WIDTH 1280
-#define WINDOW_HEIGHT 960
+#define WINDOW_WIDTH 1920
+#define WINDOW_HEIGHT 1080
 
 #define TERRAIN_WIDTH 64
 #define HEIGHTMAP_RES 2048
@@ -30,10 +30,11 @@ static GLuint terrain_heightmap;
 
 float terrain_height(float x, float y, float freq, float lacun, float gain)
 {
-	float noise = fbm_noise(0.5*x, 0.5*y, freq, lacun, gain);
+	float noise = fbm_noise(x, y, freq, lacun, gain);
 
+	// if the frequency is too low the terrain will look "terraced" or "blocky", to prevent this increase the frequancy
 	if (noise > 0.48)	
-	 	noise = lerp(0.28, 0.75, noise);
+		noise = lerp(0.28, 0.75, noise) + (0.02 * fbm_noise(x*64.0, y*64.0, freq, lacun, gain));
 
 	float mountains = 1.0 * (1.0 - sqrt(worley_noise(0.01*x, 0.015*y))); //this should always be between 0 an 1
 	//mountains *= noise * pow(mountains, noise); // correction so mountains don't spawn in seas
@@ -138,8 +139,8 @@ static vec3 sample_height(float x, float z)
 
 void make_terrain_surface(struct terrain *terra)
 {
-	int width = 64;
-	int length = 64;
+	int width = TERRAIN_WIDTH;
+	int length = TERRAIN_WIDTH;
 	float offset = 1.0;
 
 	terra->surface_mesh.vcount = 3 * 2 * width * length;
@@ -208,7 +209,7 @@ struct object make_standard_object(void)
 	obj.bbox.r[1] = 0.5;
 	obj.bbox.r[2] = 0.5;
 
-	obj.texture = load_dds_texture("data/texture/placeholder.dds");
+	obj.texture = load_dds_texture("media/texture/placeholder.dds");
 
 	mat4 model = IDENTITY_MATRIX;
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
@@ -246,10 +247,10 @@ struct water make_water(GLuint depthmap)
 		{GL_NONE, NULL}
 	};
 	wat.shader = load_shaders(pipeline);
-	wat.m = make_grid_mesh(64, 64, 1.0);
+	wat.m = make_grid_mesh(TERRAIN_WIDTH, TERRAIN_WIDTH, 1.0);
 	wat.depthmap = depthmap;
 	
-	wat.normal = load_dds_texture("data/texture/water_normal.dds");
+	wat.normal = load_dds_texture("media/texture/water_normal.dds");
 
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(wat.shader);
@@ -338,20 +339,20 @@ struct terrain make_terrain(GLuint heightmap)
 		{GL_NONE, NULL}
 	};
 	ter.shader = load_shaders(pipeline);
-	ter.m = make_grid_mesh(64, 64, 1.0);
+	ter.m = make_grid_mesh(TERRAIN_WIDTH,TERRAIN_WIDTH, 1.0);
 	make_terrain_surface(&ter);
 
 	ter.heightmap = heightmap;
-	ter.texture[0] = load_dds_texture("data/texture/grass.dds");
-	ter.texture[1] = load_dds_texture("data/texture/stone.dds");
-	ter.texture[2] = load_dds_texture("data/texture/sand.dds");
-	ter.texture[3] = load_dds_texture("data/texture/snow.dds");
+	ter.texture[0] = load_dds_texture("media/texture/grass.dds");
+	ter.texture[1] = load_dds_texture("media/texture/rock.dds");
+	ter.texture[2] = load_dds_texture("media/texture/graydirt.dds");
+	ter.texture[3] = load_dds_texture("media/texture/snowrocks.dds");
 
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(ter.shader);
 	glUniformMatrix4fv(glGetUniformLocation(ter.shader, "project"), 1, GL_FALSE, project.f);
 
-	mountain_range = load_dds_texture("data/texture/mountains.dds");
+	mountain_range = load_dds_texture("media/texture/mountains.dds");
 
 	return ter;
 }
@@ -412,19 +413,18 @@ void display_scene(struct scene *scene)
 void load_scene(struct scene *scene)
 {
 	const size_t len = HEIGHTMAP_RES * HEIGHTMAP_RES;
-	rgb *image = calloc(len, sizeof(rgb));
+	unsigned char *image = calloc(len, sizeof *image);
 
 	int n = 0;
 	for (int y = 0; y < HEIGHTMAP_RES; y++) {
 		for (int x = 0; x < HEIGHTMAP_RES; x++) {
 			float z = terrain_height(x, y, 0.002, 2.5, 2.0);
-			image[n][0] = 256 * z;
-			image[n][1] = 256 * z;
-			image[n][2] = 256 * z;
+			image[n] = 256 * z;
 			n++;
 		}
 	}
-	scene->heightmap = make_rgb_texture(image, HEIGHTMAP_RES, HEIGHTMAP_RES);
+	//scene->heightmap = make_texture(image, HEIGHTMAP_RES, HEIGHTMAP_RES);
+	scene->heightmap = make_r_texture(image, HEIGHTMAP_RES, HEIGHTMAP_RES);
 	free(image);
 
 	terrain_heightmap = scene->heightmap;

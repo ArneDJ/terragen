@@ -3,7 +3,7 @@
 layout(triangles) in;
 uniform mat4 view, project;
 uniform sampler2D terrain_height;
-uniform float time;
+uniform float heightmap_scale = 0.015625;
 
 out vec2 uv;
 out vec3 normal;
@@ -20,7 +20,7 @@ void main(void)
 	wave_pos.y = wave_pos.y + 4.0;
 	uv = wave_pos.xz;
 	fpos = wave_pos;
-	terrain_h = texture(terrain_height, uv * 0.015625).r;
+	terrain_h = texture(terrain_height, uv * heightmap_scale).r;
 	gl_Position = project * view * vec4(wave_pos, 1.0);
 }
 

@@ -7,7 +7,7 @@
 #include "noise.h"
 
 #define OCTAVES 5
-static int SEED = 91;
+static int SEED;
 
 static inline int permutation(int x, int y)
 {
