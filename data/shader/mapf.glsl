@@ -1,8 +1,10 @@
 #version 460 core
 
 uniform sampler2D voronoi;
+uniform sampler2D depth_map;
 
 in vec2 uv;
+in vec4 clip;
 
 vec4 permute(vec4 x)
 {
@@ -28,10 +30,19 @@ vec2 cellular2x2(vec2 P)
 	return d.xx ; // F1 duplicated , F2 not computed
 }
 
+// required when using a perspective projection matrix
+float linear(float depth)
+{
+	float near_plane = 0.1;
+	float far_plane = 200.0;
+    float z = depth * 2.0 - 1.0; // Back to NDC
+    return (2.0 * near_plane * far_plane) / (far_plane + near_plane - z * (far_plane - near_plane));
+}
+
 void main(void)
 {
 	const float penis = 0.015625;
-	vec4 ftexture = texture(voronoi, penis * uv);
+	//vec4 ftexture = texture(depth_map, vec2(uv.x*1920.0, uv.y*1080.0));
 	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 	/*
 	vec2 F = cellular2x2(uv);
@@ -39,6 +50,7 @@ void main(void)
 	float blobs = 1.0 - sqrt(F.x);
 	*/
 
-	gl_FragColor = ftexture;
+	float depth_value = texture(depth_map, uv * penis).r;
+	gl_FragColor = vec4(vec3(linear(depth_value) / 200.0), 1.0);
 }
 

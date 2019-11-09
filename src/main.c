@@ -16,6 +16,9 @@
 #define TERRAIN_WIDTH 64
 #define HEIGHTMAP_RES 2048
 
+#define SHADOW_WIDTH 1024
+#define SHADOW_HEIGHT 1024
+
 static SDL_Window *init_window(int width, int height);
 static SDL_GLContext init_glcontext(SDL_Window *window);
 
@@ -27,6 +30,52 @@ static vec3 box_rotation = {0.0};
 static SDL_Event event;
 static GLuint mountain_range;
 static GLuint terrain_heightmap;
+
+static GLuint depth_fbo;
+static GLuint depth_texture;
+
+void init_depth_framebuffer(void)
+{
+	glGenFramebuffers(1, &depth_fbo);
+	glGenTextures(1, &depth_texture);
+	glBindTexture(GL_TEXTURE_2D, depth_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	// attach depth texture as FBO's depth buffer
+	glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_texture, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	/*
+	glGenFramebuffers(1, &depth_fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
+
+	glGenTextures(1, &depth_texture);
+	glBindTexture(GL_TEXTURE_2D, depth_texture);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, WINDOW_WIDTH, WINDOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_texture, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+
+	GLuint rbo;
+	glGenRenderbuffers(1, &rbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WINDOW_WIDTH, WINDOW_HEIGHT);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	*/
+}
 
 float terrain_height(float x, float y, float freq, float lacun, float gain)
 {
@@ -270,6 +319,9 @@ void display_water(struct water *wat)
 	glUniform1i(glGetUniformLocation(wat->shader, "water_normal"), 1);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, wat->normal);
+	glUniform1i(glGetUniformLocation(wat->shader, "water_depth_buffer"), 2);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, depth_texture);
 	glBindVertexArray(wat->m.VAO);
 	glDrawArrays(GL_PATCHES, 0, wat->m.vcount);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -281,6 +333,9 @@ void display_map(struct map *map)
 	glUniform1i(glGetUniformLocation(map->shader, "voronoi"), 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, map->texture);
+	glUniform1i(glGetUniformLocation(map->shader, "depth_map"), 1);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, depth_texture);
 	glBindVertexArray(map->m.VAO);
 	glDrawArrays(GL_TRIANGLES, 0, map->m.vcount);
 }
@@ -398,6 +453,13 @@ void display_terrain(struct terrain *ter)
 
 void display_scene(struct scene *scene)
 {
+	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+	glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	display_terrain(&scene->terrain);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	display_terrain(&scene->terrain);
@@ -407,8 +469,9 @@ void display_scene(struct scene *scene)
 	glBindVertexArray(dotVAO);
 	glDrawArrays(GL_POINTS, 0, 2);
 	display_water(&scene->water);
-	display_map(&scene->map);
 	display_skybox(&scene->skybox);
+
+	display_map(&scene->map);
 }
 
 void load_scene(struct scene *scene)
@@ -545,6 +608,10 @@ void run_game(SDL_Window *window)
 	glDisableVertexAttribArray(0);
 	glDeleteBuffers(1, &vbo);
 
+	init_depth_framebuffer();
+	// INITIALIZE DEPTH FRAME BUFFER //
+
+	// RENDER LOOP //
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 	while (event.type != SDL_QUIT) {
 		gtime = (float)SDL_GetTicks();
@@ -560,6 +627,7 @@ void run_game(SDL_Window *window)
 		end = start;
 	}
 
+	glDeleteFramebuffers(1, &depth_fbo);
 	free(context.scene.terrain.surface);
 }
 

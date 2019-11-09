@@ -3,6 +3,7 @@
 uniform float time;
 uniform sampler2D water_normal;
 uniform sampler2D terrain_height;
+uniform sampler2D water_depth_buffer;
 uniform vec3 view_dir;
 uniform vec3 view_eye;
 uniform vec3 sunDirection = {1.0, 1.0, 1.0};
@@ -10,7 +11,7 @@ uniform vec3 sunColor = {1.0, 0.5, 0.5};
 uniform vec3 waterColor = {0.0, 0.5, 0.52};
 uniform float heightmap_scale = 0.015625;
 
-in vec3 fpos;
+in vec4 fpos;
 in vec2 uv;
 in vec3 normal;
 in float terrain_h;
@@ -32,22 +33,7 @@ vec3 fog(vec3 c, float dist, float height)
 	return c * extinction + fog_color * (1.0 - inscattering);
 }
 
-float linear(float z)
-{
-	float near = 0.1;
-	float far = 200.0;
-	return 2.0 * near * far / (far + near - (2.0 * z - 1.0) * (far - near));
-}
-
-float depth(vec2 uv)
-{
-	float d = texture(terrain_height, uv).r;
-	float bdist = linear(d);
-	d = gl_FragCoord.z;
-	float waterdist = linear(d);
-	return bdist - waterdist;
-}
-
+/*
 void main(void)
 {
 	//vec4 bump1 = texture(water_normal, uv + (0.0001*time));
@@ -84,7 +70,40 @@ void main(void)
 	vec3 view_space = vec3(distance(fpos.x, view_eye.x), distance(fpos.y, view_eye.y), distance(fpos.z, view_eye.z));
 	material = fog(material, length(view_space), fpos.y); 
 
-
 	material = pow(material, vec3(1.0/1.5));
 	gl_FragColor = vec4(material, water_depth);
 }
+*/
+
+float linear(float depth)
+{
+	float near_plane = 0.1;
+	float far_plane = 200.0;
+    float z = depth * 2.0 - 1.0; // Back to NDC
+    return (2.0 * near_plane * far_plane) / (far_plane + near_plane - z * (far_plane - near_plane));
+}
+
+void main(void)
+{
+	const float penis = 0.015625;
+	//vec4 ftexture = texture(depth_map, vec2(uv.x*1920.0, uv.y*1080.0));
+	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+	/*
+	vec2 F = cellular2x2(uv);
+	float n = 1.0 - 1.5 * F.x;
+	float blobs = 1.0 - sqrt(F.x);
+	*/
+
+	vec2 ndc = (fpos.xy / fpos.w) / 2.0 + 0.5;
+
+	float near = 0.1;
+	float far = 200.0;
+	float depth = texture(water_depth_buffer, ndc).r;
+	float floor_dist = 2.0 * near * far / (far + near - (2.0 * depth - 1.0) * (far - near));
+	depth = gl_FragCoord.z;
+	float water_dist = 2.0 * near * far / (far + near - (2.0 * depth - 1.0) * (far - near));
+	float water_depth = floor_dist - water_dist;
+
+	gl_FragColor = vec4(vec3(water_depth/ 5.0), 1.0);
+}
+

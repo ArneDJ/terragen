@@ -170,4 +170,9 @@ GLuint make_worley_texture(void)
 }
 
 
+GLuint make_depth_texture(void)
+{
+
+}
+
 

@@ -94,4 +94,12 @@ void main(void)
 
 	material = pow(material, vec3(1.0/1.5));
 	gl_FragColor = vec4(material, 1.0);
+	
+	/*
+	float near = 0.1;
+	float far = 200.0;
+	float z = gl_FragCoord.z * 2.0 - 1.0; 
+	float linearDepth = (2.0 * near * far) / (far + near - z * (far - near));
+	gl_FragColor = vec4(vec3(0.1*linearDepth), 1.0);
+	*/
 }
