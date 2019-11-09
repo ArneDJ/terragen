@@ -11,7 +11,8 @@ uniform vec3 sunColor = {1.0, 0.5, 0.5};
 uniform vec3 waterColor = {0.0, 0.5, 0.52};
 uniform float heightmap_scale = 0.015625;
 
-in vec4 fpos;
+in vec4 clip;
+in vec3 fpos;
 in vec2 uv;
 in vec3 normal;
 in float terrain_h;
@@ -33,7 +34,6 @@ vec3 fog(vec3 c, float dist, float height)
 	return c * extinction + fog_color * (1.0 - inscattering);
 }
 
-/*
 void main(void)
 {
 	//vec4 bump1 = texture(water_normal, uv + (0.0001*time));
@@ -50,18 +50,28 @@ void main(void)
 	vec3 diffuse = vec3(0.0);
 	vec3 specular = vec3(0.0);
 
-	vec3 world_to_eye = view_eye - fpos;
+	vec3 world_to_eye = view_eye - fpos.xyz;
 	vec3 eye_dir = normalize(world_to_eye);
 
 	sunLight(bump.xyz, eye_dir, 100.0, 2.0, 0.5, diffuse, specular);
     	vec3 reflection = normalize(reflect(-sunDirection, bump.xyz));
 	float direction = max(0.0, dot(eye_dir, reflection));
-	specular += pow(direction, 50.0) * sunColor * 0.5;
+	specular += pow(direction, 50.0) * sunColor * 1.5;
 
-	float water_depth = 1.0 - terrain_h;
-	water_depth = smoothstep(0.45, 0.6, water_depth);
+	vec2 ndc = (clip.xy / clip.w) / 2.0 + 0.5;
+	float near = 0.1;
+	float far = 200.0;
+	float depth = texture(water_depth_buffer, ndc).r;
+	float floor_dist = 2.0 * near * far / (far + near - (2.0 * depth - 1.0) * (far - near));
+	depth = gl_FragCoord.z;
+	float water_dist = 2.0 * near * far / (far + near - (2.0 * depth - 1.0) * (far - near));
+	float water_depth = floor_dist - water_dist;
+	water_depth = clamp(water_depth / 0.4, 0.0, 1.0);
+
+	float water_bottom = 1.0 - terrain_h;
+	water_bottom = smoothstep(0.45, 0.6, water_bottom);
 	vec3 watercolor2 = {0.0, 0.35, 0.36};
-	vec3 material = mix(waterColor, watercolor2, water_depth);
+	vec3 material = mix(waterColor, watercolor2, water_bottom);
 
 	material *= (diffuse+specular);
 
@@ -73,26 +83,13 @@ void main(void)
 	material = pow(material, vec3(1.0/1.5));
 	gl_FragColor = vec4(material, water_depth);
 }
-*/
 
-float linear(float depth)
-{
-	float near_plane = 0.1;
-	float far_plane = 200.0;
-    float z = depth * 2.0 - 1.0; // Back to NDC
-    return (2.0 * near_plane * far_plane) / (far_plane + near_plane - z * (far_plane - near_plane));
-}
-
+/*
 void main(void)
 {
 	const float penis = 0.015625;
 	//vec4 ftexture = texture(depth_map, vec2(uv.x*1920.0, uv.y*1080.0));
 	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-	/*
-	vec2 F = cellular2x2(uv);
-	float n = 1.0 - 1.5 * F.x;
-	float blobs = 1.0 - sqrt(F.x);
-	*/
 
 	vec2 ndc = (fpos.xy / fpos.w) / 2.0 + 0.5;
 
@@ -106,4 +103,5 @@ void main(void)
 
 	gl_FragColor = vec4(vec3(water_depth/ 5.0), 1.0);
 }
+*/
 

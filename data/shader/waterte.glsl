@@ -7,7 +7,8 @@ uniform float heightmap_scale = 0.015625;
 
 out vec2 uv;
 out vec3 normal;
-out vec4 fpos;
+out vec3 fpos;
+out vec4 clip;
 out float terrain_h;
 
 void main(void)
@@ -19,8 +20,9 @@ void main(void)
 	vec3 wave_pos = gl_Position.xyz;
 	wave_pos.y = wave_pos.y + 4.0;
 	uv = wave_pos.xz;
+	fpos = wave_pos;
 	terrain_h = texture(terrain_height, uv * heightmap_scale).r;
-	fpos = project * view * vec4(wave_pos, 1.0);
-	gl_Position = fpos;
+	clip = project * view * vec4(wave_pos, 1.0);
+	gl_Position = clip;
 }
 
