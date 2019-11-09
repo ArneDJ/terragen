@@ -35,6 +35,7 @@ float terrain_height(float x, float y, float freq, float lacun, float gain)
 	// if the frequency is too low the terrain will look "terraced" or "blocky", to prevent this increase the frequancy
 	if (noise > 0.48)	
 		noise = lerp(0.28, 0.75, noise) + (0.02 * fbm_noise(x*64.0, y*64.0, freq, lacun, gain));
+		//noise = lerp(0.28, 0.75, noise) + (0.02 * worley_noise(0.05*x, 0.05*y));
 
 	float mountains = 1.0 * (1.0 - sqrt(worley_noise(0.01*x, 0.015*y))); //this should always be between 0 an 1
 	//mountains *= noise * pow(mountains, noise); // correction so mountains don't spawn in seas

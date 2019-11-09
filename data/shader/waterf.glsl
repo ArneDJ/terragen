@@ -2,11 +2,13 @@
 
 uniform float time;
 uniform sampler2D water_normal;
+uniform sampler2D terrain_height;
 uniform vec3 view_dir;
 uniform vec3 view_eye;
 uniform vec3 sunDirection = {1.0, 1.0, 1.0};
 uniform vec3 sunColor = {1.0, 0.5, 0.5};
 uniform vec3 waterColor = {0.0, 0.5, 0.52};
+uniform float heightmap_scale = 0.015625;
 
 in vec3 fpos;
 in vec2 uv;
@@ -30,6 +32,22 @@ vec3 fog(vec3 c, float dist, float height)
 	return c * extinction + fog_color * (1.0 - inscattering);
 }
 
+float linear(float z)
+{
+	float near = 0.1;
+	float far = 200.0;
+	return 2.0 * near * far / (far + near - (2.0 * z - 1.0) * (far - near));
+}
+
+float depth(vec2 uv)
+{
+	float d = texture(terrain_height, uv).r;
+	float bdist = linear(d);
+	d = gl_FragCoord.z;
+	float waterdist = linear(d);
+	return bdist - waterdist;
+}
+
 void main(void)
 {
 	//vec4 bump1 = texture(water_normal, uv + (0.0001*time));
@@ -46,17 +64,16 @@ void main(void)
 	vec3 diffuse = vec3(0.0);
 	vec3 specular = vec3(0.0);
 
-	vec3 worldToEye = view_eye - fpos;
-	vec3 eyeDirection = normalize(worldToEye);
-	sunLight(bump.xyz, eyeDirection, 100.0, 2.0, 0.5, diffuse, specular);
+	vec3 world_to_eye = view_eye - fpos;
+	vec3 eye_dir = normalize(world_to_eye);
 
+	sunLight(bump.xyz, eye_dir, 100.0, 2.0, 0.5, diffuse, specular);
     	vec3 reflection = normalize(reflect(-sunDirection, bump.xyz));
-	float direction = max(0.0, dot(eyeDirection, reflection));
-	specular += pow(direction, 25.0) * sunColor * 0.5;
+	float direction = max(0.0, dot(eye_dir, reflection));
+	specular += pow(direction, 50.0) * sunColor * 0.5;
 
 	float water_depth = 1.0 - terrain_h;
-	//water_depth = clamp(water_depth, 0.6, 1.0);
-	water_depth = smoothstep(0.5, 0.7, water_depth);
+	water_depth = smoothstep(0.45, 0.6, water_depth);
 	vec3 watercolor2 = {0.0, 0.35, 0.36};
 	vec3 material = mix(waterColor, watercolor2, water_depth);
 
@@ -65,9 +82,9 @@ void main(void)
 	vec3 fog_color = {0.46, 0.7, 0.99};
 
 	vec3 view_space = vec3(distance(fpos.x, view_eye.x), distance(fpos.y, view_eye.y), distance(fpos.z, view_eye.z));
-	material = fog(material, length(view_space), fpos.y), 
+	material = fog(material, length(view_space), fpos.y); 
+
 
 	material = pow(material, vec3(1.0/1.5));
-
-	gl_FragColor = vec4(material, 1.0);
+	gl_FragColor = vec4(material, water_depth);
 }
