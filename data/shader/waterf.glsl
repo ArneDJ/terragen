@@ -56,7 +56,7 @@ void main(void)
 	sunLight(bump.xyz, eye_dir, 100.0, 2.0, 0.5, diffuse, specular);
     	vec3 reflection = normalize(reflect(-sunDirection, bump.xyz));
 	float direction = max(0.0, dot(eye_dir, reflection));
-	specular += pow(direction, 50.0) * sunColor * 1.5;
+	specular += pow(direction, 1.0) * sunColor * 1.0;
 
 	vec2 ndc = (clip.xy / clip.w) / 2.0 + 0.5;
 	float near = 0.1;
@@ -66,7 +66,7 @@ void main(void)
 	depth = gl_FragCoord.z;
 	float water_dist = 2.0 * near * far / (far + near - (2.0 * depth - 1.0) * (far - near));
 	float water_depth = floor_dist - water_dist;
-	water_depth = clamp(water_depth / 0.4, 0.0, 1.0);
+	water_depth = clamp(water_depth / 0.2, 0.0, 1.0);
 
 	float water_bottom = 1.0 - terrain_h;
 	water_bottom = smoothstep(0.45, 0.6, water_bottom);
