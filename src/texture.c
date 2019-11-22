@@ -197,7 +197,7 @@ GLuint make_river_texture(void)
 {
 	GLuint texnum;
 	size_t len = 512 * 512;
-	unsigned char *buf = voronoi_rivers();
+	unsigned char *buf = voronoi_rivers(512, 512);
 	rgb *image = calloc(len, sizeof(rgb));
 	int nbuf = 0;
 	for (int i = 0; i < len; i++) {

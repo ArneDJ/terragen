@@ -121,7 +121,6 @@ void main(void)
 	//float river_h = texture(rivers, uv * 0.001953).r;
 	const float ratio = 0.00195;
 	float river_h = texture(rivers, uv * heightmap_scale).r;
-	height *= river_h;
 
 	vec3 newpos = gl_Position.xyz;
 

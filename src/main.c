@@ -9,6 +9,7 @@
 #include "camera.h"
 #include "texture.h"
 #include "noise.h"
+#include "voronoi.h"
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
@@ -60,6 +61,7 @@ float terrain_height(float x, float y, float freq, float lacun, float gain)
 	// if the frequency is too low the terrain will look "terraced" or "blocky", to prevent this increase the frequancy
 	if (noise > 0.48)	
 		noise = lerp(0.28, 0.75, noise) + (0.02 * fbm_noise(x*64.0, y*64.0, freq, lacun, gain));
+		//noise = lerp(0.28, 0.75, noise);
 		//noise = lerp(0.28, 0.75, noise) + (0.02 * worley_noise(0.05*x, 0.05*y));
 
 	float mountains = 1.0 * (1.0 - sqrt(worley_noise(0.01*x, 0.015*y))); //this should always be between 0 an 1
@@ -457,17 +459,20 @@ void load_scene(struct scene *scene)
 {
 	const size_t len = HEIGHTMAP_RES * HEIGHTMAP_RES;
 	unsigned char *image = calloc(len, sizeof *image);
+	unsigned char *rivers = voronoi_rivers(HEIGHTMAP_RES, HEIGHTMAP_RES);
 
 	int n = 0;
 	for (int y = 0; y < HEIGHTMAP_RES; y++) {
 		for (int x = 0; x < HEIGHTMAP_RES; x++) {
 			float z = terrain_height(x, y, 0.002, 2.5, 2.0);
-			image[n] = 255 * z;
+			int index = y * HEIGHTMAP_RES * 3 + x * 3;
+			image[n] = rivers[index] * z;
 			n++;
 		}
 	}
 	//scene->heightmap = make_texture(image, HEIGHTMAP_RES, HEIGHTMAP_RES);
 	scene->heightmap = make_r_texture(image, HEIGHTMAP_RES, HEIGHTMAP_RES);
+	free(rivers);
 	free(image);
 
 	terrain_heightmap = scene->heightmap;

@@ -130,30 +130,27 @@ static void draw_triangle(const jcv_point *v0, const jcv_point *v1, const jcv_po
     }
 }
 
-void make_river(const jcv_diagram *diagram, unsigned char *image)
+void make_river(const jcv_diagram *diagram, unsigned char *image, int width, int height)
 {
 	frand(time(NULL));
-    	unsigned char color_line[] = {100, 100, 100};
+    	unsigned char color_line[] = {150, 150, 150};
 	const int RIVER_SIZE = 20;
 	const jcv_site *sites = jcv_diagram_get_sites(diagram);
 	int nsites = diagram->numsites;
         const jcv_site *site = &sites[rand() % nsites];
-	printf("starting at site %d %d\n", (int)site->p.x, (int)site->p.y);
 
 	int x[RIVER_SIZE];
 	int y[RIVER_SIZE];
 
 	for (int i = 0; i < RIVER_SIZE; i++) {
-		printf("hopping to next site\n");
 		const jcv_graphedge *e = site->edges;
 		site = e->neighbor;
-		printf("next site %d %d\n", (int)site->p.x, (int)site->p.y);
 		x[i] = (int)site->p.x;
 		y[i] = (int)site->p.y;
 	}
 
 	for (int i = 0; i < RIVER_SIZE-1; i++) {
-		draw_thick_line(x[i], y[i], x[i+1], y[i+1], image, 512, 512, color_line, 4.0);
+		draw_thick_line(x[i], y[i], x[i+1], y[i+1], image, width, height, color_line, 32.0);
 	}
 
 }
@@ -203,17 +200,17 @@ unsigned char *do_voronoi(void)
 	return image;
 }
 
-unsigned char *voronoi_rivers(void)
+unsigned char *voronoi_rivers(int width, int height)
 {
-	unsigned char *image = calloc(3 * WIDTH*HEIGHT, sizeof(unsigned char));
-	for (int i = 0; i < 3 * WIDTH*HEIGHT; i++) {
+	unsigned char *image = calloc(3 * width*height, sizeof(unsigned char));
+	for (int i = 0; i < 3 * width*height; i++) {
 		image[i] = 255.0;
 	}
 	jcv_point site[NSITES];
 
 	for (int i = 0; i < NSITES; i++) {
-		site[i].x = frand(WIDTH);
-		site[i].y = frand(HEIGHT);
+		site[i].x = frand(width);
+		site[i].y = frand(height);
 	}
 
 	jcv_diagram diagram;
@@ -221,7 +218,7 @@ unsigned char *voronoi_rivers(void)
 	jcv_diagram_generate(NSITES, site, 0, 0, &diagram);
 
 	for (int i = 0; i < NRIVERS; i++) {
-		make_river(&diagram, image);
+		make_river(&diagram, image, width, height);
 	}
 
 	jcv_diagram_free(&diagram);
