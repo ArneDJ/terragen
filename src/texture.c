@@ -9,6 +9,9 @@
 #include "noise.h"
 #include "voronoi.h"
 
+static GLuint make_rgb_texture(unsigned char *buf, int width, int height);
+static void rgbchannel(rgb *image, unsigned char *buf, int width, int height);
+
 GLuint load_dds_texture(const char *fpath) 
 {
 	GLuint texnum;
@@ -91,26 +94,6 @@ GLuint load_dds_texture(const char *fpath)
 	return texnum;
 }
 
-
-
-
-
-GLuint make_rgb_texture(rgb *image, int width, int height)
-{
-	GLuint texnum;
-
-	glGenTextures(1, &texnum);
-	glBindTexture(GL_TEXTURE_2D, texnum);
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, width, height);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, image);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	return texnum;
-}
-
 GLuint make_r_texture(unsigned char *image, int width, int height)
 {
 	GLuint texnum;
@@ -128,96 +111,55 @@ GLuint make_r_texture(unsigned char *image, int width, int height)
 	return texnum;
 }
 
-/*
-GLuint make_voronoi_texture(void)
+
+GLuint make_voronoi_texture(int width, int height)
 {
-	GLuint texnum;
-	size_t len = 1024 * 1024;
-	unsigned char *buf = gen_voronoi_map();
-	rgb *image = calloc(len, sizeof(rgb));
-	int nbuf = 0;
-	for (int i = 0; i < len; i++) {
-		image[i][0] = buf[nbuf++];
-		image[i][1] = buf[nbuf++];
-		image[i][2] = buf[nbuf++];
-	}
-
-	texnum = make_rgb_texture(image, 1024, 1024);
-
-	free(buf);
-	free(image);
-
-	return texnum;
-}
-*/
-
-GLuint make_worley_texture(void)
-{
-	GLuint texnum;
-	size_t len = 1024 * 1024;
-	unsigned char *buf = gen_worley_map();
-	rgb *image = calloc(len, sizeof(rgb));
-	int nbuf = 0;
-	for (int i = 0; i < len; i++) {
-		image[i][0] = buf[nbuf++];
-		image[i][1] = buf[nbuf++];
-		image[i][2] = buf[nbuf++];
-	}
-
-	texnum = make_rgb_texture(image, 1024, 1024);
-
-	free(buf);
-	free(image);
-
-	return texnum;
-}
-
-GLuint make_voronoi_texture(void)
-{
-	GLuint texnum;
-	size_t len = 512 * 512;
 	unsigned char *buf = do_voronoi();
-	rgb *image = calloc(len, sizeof(rgb));
-	int nbuf = 0;
-	for (int i = 0; i < len; i++) {
-		image[i][0] = buf[nbuf++];
-		image[i][1] = buf[nbuf++];
-		image[i][2] = buf[nbuf++];
-	}
-
-	texnum = make_rgb_texture(image, 512, 512);
+	GLuint texnum = make_rgb_texture(buf, width, height);
 
 	free(buf);
-	free(image);
 
 	return texnum;
 }
 
-GLuint make_river_texture(void)
+GLuint make_river_texture(int width, int height)
+{
+	unsigned char *buf = voronoi_rivers(width, height);
+	GLuint texnum = make_rgb_texture(buf, width, height);
+
+	free(buf);
+
+	return texnum;
+}
+
+static GLuint make_rgb_texture(unsigned char *buf, int width, int height)
 {
 	GLuint texnum;
-	size_t len = 512 * 512;
-	unsigned char *buf = voronoi_rivers(512, 512);
-	rgb *image = calloc(len, sizeof(rgb));
-	int nbuf = 0;
-	for (int i = 0; i < len; i++) {
-		image[i][0] = buf[nbuf++];
-		image[i][1] = buf[nbuf++];
-		image[i][2] = buf[nbuf++];
-	}
 
-	texnum = make_rgb_texture(image, 512, 512);
+	rgb *image = calloc(width*height, sizeof(rgb));
+	rgbchannel(image, buf, width, height);
 
-	free(buf);
+	glGenTextures(1, &texnum);
+	glBindTexture(GL_TEXTURE_2D, texnum);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, width, height);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, image);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+
 	free(image);
-
 	return texnum;
 }
 
-
-GLuint make_depth_texture(void)
+static void rgbchannel(rgb *image, unsigned char *buf, int width, int height)
 {
-
+	size_t len = width * height;
+	int nchannel = 0;
+	for (int i = 0; i < len; i++) {
+		image[i][0] = buf[nchannel++];
+		image[i][1] = buf[nchannel++];
+		image[i][2] = buf[nchannel++];
+	}
 }
-
 

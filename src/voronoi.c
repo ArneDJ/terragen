@@ -132,7 +132,7 @@ static void draw_triangle(const jcv_point *v0, const jcv_point *v1, const jcv_po
 
 void make_river(const jcv_diagram *diagram, unsigned char *image, int width, int height)
 {
-	frand(time(NULL));
+	//frand(time(NULL));
     	unsigned char color_line[] = {150, 150, 150};
 	const int RIVER_SIZE = 20;
 	const jcv_site *sites = jcv_diagram_get_sites(diagram);
@@ -202,6 +202,7 @@ unsigned char *do_voronoi(void)
 
 unsigned char *voronoi_rivers(int width, int height)
 {
+	frand(time(NULL));
 	unsigned char *image = calloc(3 * width*height, sizeof(unsigned char));
 	for (int i = 0; i < 3 * width*height; i++) {
 		image[i] = 255.0;

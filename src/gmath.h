@@ -4,7 +4,8 @@
 #define frand(x) (rand() / (1. + RAND_MAX) * x)
 
 typedef union {
-	float f[2]; struct { float x, y; };
+	float f[2]; 
+	struct { float x, y; };
 } vec2;
 
 typedef union {

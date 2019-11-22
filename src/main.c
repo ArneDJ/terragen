@@ -150,7 +150,7 @@ struct map make_map(void)
 	map.shader = load_shaders(pipeline);
 
 	//map.texture = make_voronoi_texture();
-	map.texture = make_river_texture();
+	map.texture = make_river_texture(512, 512);
 	river_texture = map.texture;
 	//map.texture = terrain_heightmap;
 
