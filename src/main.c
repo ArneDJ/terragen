@@ -33,6 +33,7 @@ static GLuint terrain_heightmap;
 
 static GLuint depth_fbo;
 static GLuint depth_texture;
+static GLuint river_texture;
 
 void init_depth_framebuffer(void)
 {
@@ -146,7 +147,9 @@ struct map make_map(void)
 	};
 	map.shader = load_shaders(pipeline);
 
-	map.texture = make_voronoi_texture();
+	//map.texture = make_voronoi_texture();
+	map.texture = make_river_texture();
+	river_texture = map.texture;
 	//map.texture = terrain_heightmap;
 
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
@@ -378,6 +381,7 @@ struct terrain make_terrain(GLuint heightmap)
 	ter.texture[1] = load_dds_texture("media/texture/rock.dds");
 	ter.texture[2] = load_dds_texture("media/texture/graydirt.dds");
 	ter.texture[3] = load_dds_texture("media/texture/snowrocks.dds");
+	ter.texture[4] = river_texture;
 
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(ter.shader);
@@ -412,7 +416,7 @@ void display_terrain(struct terrain *ter)
 	glActiveTexture(GL_TEXTURE4);
 	glBindTexture(GL_TEXTURE_2D, ter->heightmap);
 
-	glUniform1i(glGetUniformLocation(ter->shader, "voronoi"), 5);
+	glUniform1i(glGetUniformLocation(ter->shader, "rivers"), 5);
 	glActiveTexture(GL_TEXTURE5);
 	glBindTexture(GL_TEXTURE_2D, ter->texture[4]);
 
@@ -458,7 +462,7 @@ void load_scene(struct scene *scene)
 	for (int y = 0; y < HEIGHTMAP_RES; y++) {
 		for (int x = 0; x < HEIGHTMAP_RES; x++) {
 			float z = terrain_height(x, y, 0.002, 2.5, 2.0);
-			image[n] = 256 * z;
+			image[n] = 255 * z;
 			n++;
 		}
 	}

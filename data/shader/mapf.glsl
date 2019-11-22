@@ -42,6 +42,7 @@ float linear(float depth)
 void main(void)
 {
 	const float ratio = 0.015625;
+	//const float ratio = 0.00195;
 	vec4 ftexture = texture(voronoi, uv*ratio);
 	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 	/*

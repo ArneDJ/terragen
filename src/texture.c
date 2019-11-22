@@ -193,6 +193,27 @@ GLuint make_voronoi_texture(void)
 	return texnum;
 }
 
+GLuint make_river_texture(void)
+{
+	GLuint texnum;
+	size_t len = 512 * 512;
+	unsigned char *buf = voronoi_rivers();
+	rgb *image = calloc(len, sizeof(rgb));
+	int nbuf = 0;
+	for (int i = 0; i < len; i++) {
+		image[i][0] = buf[nbuf++];
+		image[i][1] = buf[nbuf++];
+		image[i][2] = buf[nbuf++];
+	}
+
+	texnum = make_rgb_texture(image, 512, 512);
+
+	free(buf);
+	free(image);
+
+	return texnum;
+}
+
 
 GLuint make_depth_texture(void)
 {

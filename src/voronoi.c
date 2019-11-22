@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 #include "voronoi.h"
 
 #define JC_VORONOI_IMPLEMENTATION
@@ -9,6 +10,7 @@
 #define WIDTH 512
 #define HEIGHT 512
 #define NCHANNELS 3
+#define NRIVERS 10
 
 // http://fgiesen.wordpress.com/2013/02/08/triangle-rasterization-in-practice/
 static inline int orient2d(const jcv_point* a, const jcv_point* b, const jcv_point* c)
@@ -130,7 +132,8 @@ static void draw_triangle(const jcv_point *v0, const jcv_point *v1, const jcv_po
 
 void make_river(const jcv_diagram *diagram, unsigned char *image)
 {
-    	unsigned char color_line[] = {0, 0, 255};
+	frand(time(NULL));
+    	unsigned char color_line[] = {100, 100, 100};
 	const int RIVER_SIZE = 20;
 	const jcv_site *sites = jcv_diagram_get_sites(diagram);
 	int nsites = diagram->numsites;
@@ -196,9 +199,33 @@ unsigned char *do_voronoi(void)
 		}
 	}
 
-	make_river(&diagram, image);
+	jcv_diagram_free(&diagram);
+	return image;
+}
+
+unsigned char *voronoi_rivers(void)
+{
+	unsigned char *image = calloc(3 * WIDTH*HEIGHT, sizeof(unsigned char));
+	for (int i = 0; i < 3 * WIDTH*HEIGHT; i++) {
+		image[i] = 255.0;
+	}
+	jcv_point site[NSITES];
+
+	for (int i = 0; i < NSITES; i++) {
+		site[i].x = frand(WIDTH);
+		site[i].y = frand(HEIGHT);
+	}
+
+	jcv_diagram diagram;
+	memset(&diagram, 0, sizeof(jcv_diagram));
+	jcv_diagram_generate(NSITES, site, 0, 0, &diagram);
+
+	for (int i = 0; i < NRIVERS; i++) {
+		make_river(&diagram, image);
+	}
 
 	jcv_diagram_free(&diagram);
 	return image;
 }
+
 

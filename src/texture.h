@@ -25,3 +25,5 @@ GLuint make_rgb_texture(rgb *image, int width, int height);
 GLuint make_voronoi_texture(void);
 
 GLuint make_worley_texture(void);
+
+GLuint make_river_texture(void);
