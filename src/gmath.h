@@ -63,7 +63,7 @@ struct OBB {
 float lerp(float a, float b, float t);
 float fract(float x);
 float clamp(float n, float min, float max);
-float smoothstep(float edge0, float edge1, float x);
+float smoothstep(float min, float max, float x);
 
 float vec2_dot(vec2 a, vec2 b);
 
@@ -79,12 +79,12 @@ float vec3_magnitude(vec3 v);
 mat4 make_project_matrix(int fov, float aspect, float near, float far);
 mat4 make_view_matrix(vec3 eye, vec3 center, vec3 up);
 mat4 identity_matrix(void);
-void mat4_translate(mat4 *m, vec3 v);
 mat4 identity_matrix(void);
 mat4 mat4_rotate_x(mat4 matrix, float angle);
 mat4 mat4_rotate_y(mat4 matrix, float angle);
 mat4 mat4_rotate_z(mat4 matrix, float angle);
 mat4 mat4_rotate_xyz(mat4 matrix, float x, float y, float z);
+void mat4_translate(mat4 *m, vec3 v);
 
 int test_ray_AABB(vec3 p, vec3 d, struct AABB a);
 int test_ray_sphere(vec3 p, vec3 d, struct sphere s);
