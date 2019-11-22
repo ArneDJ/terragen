@@ -41,8 +41,8 @@ float linear(float depth)
 
 void main(void)
 {
-	const float penis = 0.015625;
-	//vec4 ftexture = texture(depth_map, vec2(uv.x*1920.0, uv.y*1080.0));
+	const float ratio = 0.015625;
+	vec4 ftexture = texture(voronoi, uv*ratio);
 	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 	/*
 	vec2 F = cellular2x2(uv);
@@ -50,7 +50,6 @@ void main(void)
 	float blobs = 1.0 - sqrt(F.x);
 	*/
 
-	float depth_value = texture(depth_map, uv * penis).r;
-	gl_FragColor = vec4(vec3(linear(depth_value) / 200.0), 1.0);
+	gl_FragColor = ftexture;
 }
 
