@@ -6,9 +6,7 @@
 #define JC_VORONOI_IMPLEMENTATION
 #include "jc_voronoi.h"
 
-#define NSITES 200
-#define WIDTH 512
-#define HEIGHT 512
+#define NSITES 500
 #define NCHANNELS 3
 #define NRIVERS 10
 
@@ -145,14 +143,14 @@ void make_river(const jcv_diagram *diagram, unsigned char *image, int width, int
 
 }
 
-unsigned char *do_voronoi(void)
+unsigned char *do_voronoi(int width, int height)
 {
-	unsigned char *image = calloc(3 * WIDTH*HEIGHT, sizeof(unsigned char));
+	unsigned char *image = calloc(3 * width*height, sizeof(unsigned char));
 	jcv_point site[NSITES];
 
 	for (int i = 0; i < NSITES; i++) {
-		site[i].x = frand(WIDTH);
-		site[i].y = frand(HEIGHT);
+		site[i].x = frand(width);
+		site[i].y = frand(height);
 	}
 
 	jcv_diagram diagram;
@@ -166,7 +164,7 @@ unsigned char *do_voronoi(void)
 		const jcv_site *site = &sites[i];
 		jcv_point p = site->p;
 
-		plot((int)p.x, (int)p.y, image, WIDTH, HEIGHT, sitecolor);
+		plot((int)p.x, (int)p.y, image, width, height, sitecolor);
 	}
 
 	/* fill the cells */
@@ -181,7 +179,7 @@ unsigned char *do_voronoi(void)
 		const jcv_graphedge *e = site->edges;
 
 		while (e) {
-			draw_triangle(&site->p, &e->pos[0], &e->pos[1], image, WIDTH, HEIGHT, rcolor);
+			draw_triangle(&site->p, &e->pos[0], &e->pos[1], image, width, height, rcolor);
 			e = e->next;
 		}
 	}

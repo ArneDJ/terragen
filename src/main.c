@@ -23,15 +23,14 @@
 static SDL_Window *init_window(int width, int height);
 static SDL_GLContext init_glcontext(SDL_Window *window);
 
-static SDL_Event event;
-static GLuint terrain_heightmap;
-
-static GLuint depth_fbo;
 static GLuint depth_texture;
-static GLuint river_texture;
 
-void init_depth_framebuffer(void)
+static GLuint vao;
+
+static GLuint init_depth_framebuffer(void)
 {
+	GLuint depth_fbo;
+
 	glGenFramebuffers(1, &depth_fbo);
 	glGenTextures(1, &depth_texture);
 	glBindTexture(GL_TEXTURE_2D, depth_texture);
@@ -40,12 +39,15 @@ void init_depth_framebuffer(void)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
 	// attach depth texture as FBO's depth buffer
 	glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_texture, 0);
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	return depth_fbo;
 }
 
 float terrain_height(float x, float y, float freq, float lacun, float gain)
@@ -134,7 +136,7 @@ struct map make_map(void)
 {
 	struct map map;
 
-	map.m = make_grid_mesh(64, 64, 1.0); 
+	map.m = make_grid_mesh(1, 1, 128.0); 
 
 	struct shader pipeline[] = {
 		{GL_VERTEX_SHADER, "data/shader/mapv.glsl"},
@@ -143,10 +145,7 @@ struct map make_map(void)
 	};
 	map.shader = load_shaders(pipeline);
 
-	//map.texture = make_voronoi_texture();
-	map.texture = make_river_texture(512, 512);
-	river_texture = map.texture;
-	//map.texture = terrain_heightmap;
+	map.texture = make_voronoi_texture(1024, 1024);
 
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(map.shader);
@@ -313,14 +312,13 @@ struct terrain make_terrain(GLuint heightmap)
 		{GL_NONE, NULL}
 	};
 	ter.shader = load_shaders(pipeline);
-	ter.m = make_grid_mesh(TERRAIN_WIDTH,TERRAIN_WIDTH, 1.0);
+	ter.m = make_patch_mesh(128,128, 1.0);
 
 	ter.heightmap = heightmap;
 	ter.texture[0] = load_dds_texture("media/texture/grass.dds");
 	ter.texture[1] = load_dds_texture("media/texture/rock.dds");
 	ter.texture[2] = load_dds_texture("media/texture/graydirt.dds");
 	ter.texture[3] = load_dds_texture("media/texture/snowrocks.dds");
-	ter.texture[4] = river_texture;
 
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(ter.shader);
@@ -353,14 +351,10 @@ void display_terrain(struct terrain *ter)
 	glActiveTexture(GL_TEXTURE4);
 	glBindTexture(GL_TEXTURE_2D, ter->heightmap);
 
-	glUniform1i(glGetUniformLocation(ter->shader, "rivers"), 5);
-	glActiveTexture(GL_TEXTURE5);
-	glBindTexture(GL_TEXTURE_2D, ter->texture[4]);
-
-	glBindVertexArray(ter->surface_mesh.VAO);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glDrawArrays(GL_PATCHES, 0, ter->surface_mesh.vcount);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glBindVertexArray(ter->m.VAO);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glDrawArrays(GL_PATCHES, 0, ter->m.vcount);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
 void display_scene(struct scene *scene)
@@ -376,7 +370,7 @@ void display_scene(struct scene *scene)
 */
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	//display_terrain(&scene->terrain);
+	display_terrain(&scene->terrain);
 	//display_water(&scene->water);
 	display_standard_object(&scene->object);
 	display_skybox(&scene->skybox);
@@ -385,29 +379,10 @@ void display_scene(struct scene *scene)
 
 void load_scene(struct scene *scene)
 {
-	const size_t len = HEIGHTMAP_RES * HEIGHTMAP_RES;
-	unsigned char *image = calloc(len, sizeof *image);
-	unsigned char *rivers = voronoi_rivers(HEIGHTMAP_RES, HEIGHTMAP_RES);
-
-	int n = 0;
-	for (int y = 0; y < HEIGHTMAP_RES; y++) {
-		for (int x = 0; x < HEIGHTMAP_RES; x++) {
-			float z = terrain_height(x, y, 0.002, 2.5, 2.0);
-			int index = y * HEIGHTMAP_RES * 3 + x * 3;
-			image[n] = rivers[index] * z;
-			n++;
-		}
-	}
-	//scene->heightmap = make_texture(image, HEIGHTMAP_RES, HEIGHTMAP_RES);
-	scene->heightmap = make_r_texture(image, HEIGHTMAP_RES, HEIGHTMAP_RES);
-	free(rivers);
-	free(image);
-
-	terrain_heightmap = scene->heightmap;
 
 	scene->skybox = make_skybox();
 	scene->terrain = make_terrain(scene->heightmap);
-	scene->water = make_water(scene->heightmap);
+	//scene->water = make_water(scene->heightmap);
 	scene->object = make_standard_object();
 	scene->map = make_map();
 
@@ -457,20 +432,21 @@ void update_context(struct context *context)
 void run_game(SDL_Window *window)
 {
 	struct context context = {0};
-	load_scene(&context.scene);
 	context.camera = init_camera(10.0, 8.0, 10.0, 90.0, 0.2);
-	float start, end = 0.0;
+	load_scene(&context.scene);
 
 	// INITIALIZE DEPTH FRAME BUFFER //
-	init_depth_framebuffer();
+	GLuint depth_fbo = init_depth_framebuffer();
 
 	// RENDER LOOP //
+	float start, end = 0.0;
 	SDL_SetRelativeMouseMode(SDL_TRUE);
+
+	SDL_Event event;
 	while (event.type != SDL_QUIT) {
 		gtime = (float)SDL_GetTicks();
 		start = gtime * 0.001;
-		float delta = start - end;
-		context.delta = delta;
+		context.delta = start - end;
 
 		while(SDL_PollEvent(&event));
 		update_context(&context);
@@ -481,7 +457,6 @@ void run_game(SDL_Window *window)
 	}
 
 	glDeleteFramebuffers(1, &depth_fbo);
-	free(context.scene.terrain.surface);
 }
 
 static SDL_Window *init_window(int width, int height)

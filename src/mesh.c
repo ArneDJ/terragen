@@ -57,6 +57,49 @@ static struct vertex make_plane_vertex(float x, float y, float z)
 	return v;
 }
 
+struct mesh make_patch_mesh(int width, int length, float offset)
+{
+	struct mesh m;
+	m.vcount = 4 * width * length;
+
+	vec3 *v = calloc(m.vcount, sizeof(vec3));
+
+	vec2 origin = {0.0, 0.0};
+	int nvertex = 0;
+	for (int i = 0; i < width; i++) {
+		for (int j = 0; j < length; j++) {
+			v[nvertex++] = vec3_make(origin.x, 0.0, origin.y);
+			v[nvertex++] = vec3_make(origin.x+offset, 0.0, origin.y);
+			v[nvertex++] = vec3_make(origin.x, 0.0, origin.y+offset);
+			v[nvertex++] = vec3_make(origin.x+offset, 0.0, origin.y+offset);
+
+			origin.x += offset;
+		}
+		origin.x = 0.0;
+		origin.y += offset;
+	}
+
+	glGenVertexArrays(1, &m.VAO);
+	glBindVertexArray(m.VAO);
+
+	GLuint vbo;
+	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+	glBufferData(GL_ARRAY_BUFFER, m.vcount * sizeof(vec3), v, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLvoid*)0);
+
+	glPatchParameteri(GL_PATCH_VERTICES, 4);
+
+	glBindVertexArray(0);
+	glDisableVertexAttribArray(0);
+	glDeleteBuffers(1, &vbo);
+
+	free(v);
+	return m;
+}
+
 struct mesh make_grid_mesh(int width, int length, float offset)
 {
 	struct mesh m;

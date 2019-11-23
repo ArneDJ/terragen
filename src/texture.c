@@ -111,10 +111,9 @@ GLuint make_r_texture(unsigned char *image, int width, int height)
 	return texnum;
 }
 
-
 GLuint make_voronoi_texture(int width, int height)
 {
-	unsigned char *buf = do_voronoi();
+	unsigned char *buf = do_voronoi(width, height);
 	GLuint texnum = make_rgb_texture(buf, width, height);
 
 	free(buf);
@@ -143,8 +142,10 @@ static GLuint make_rgb_texture(unsigned char *buf, int width, int height)
 	glBindTexture(GL_TEXTURE_2D, texnum);
 	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, width, height);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, image);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	
+	/* smooth mag filter */
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 

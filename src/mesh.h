@@ -15,6 +15,7 @@ struct mesh make_cube_mesh(void);
 
 void instance_mesh(struct mesh *m, int amount, vec3 *positions);
 
+struct mesh make_patch_mesh(int width, int length, float offset);
 
 
 
