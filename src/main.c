@@ -17,19 +17,13 @@
 #define TERRAIN_WIDTH 64
 #define HEIGHTMAP_RES 2048
 
-#define SHADOW_WIDTH 1024
-#define SHADOW_HEIGHT 1024
+#define DTEX_WIDTH 1024
+#define DTEX_HEIGHT 1024
 
 static SDL_Window *init_window(int width, int height);
 static SDL_GLContext init_glcontext(SDL_Window *window);
 
-static GLuint dotVAO;
-static GLuint dot_shader;
-static vec3 box_velocity = {0.0};
-static vec3 box_destination = {0.0};
-static vec3 box_rotation = {0.0};
 static SDL_Event event;
-static GLuint mountain_range;
 static GLuint terrain_heightmap;
 
 static GLuint depth_fbo;
@@ -41,7 +35,7 @@ void init_depth_framebuffer(void)
 	glGenFramebuffers(1, &depth_fbo);
 	glGenTextures(1, &depth_texture);
 	glBindTexture(GL_TEXTURE_2D, depth_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, DTEX_WIDTH, DTEX_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -167,61 +161,6 @@ static vec3 sample_height(float x, float z)
 	return vec3_make(x, amplitude * terrain_height(x*16, z*16, 0.004, 2.5, 2.0), z);
 }
 
-void make_terrain_surface(struct terrain *terra)
-{
-	int width = TERRAIN_WIDTH;
-	int length = TERRAIN_WIDTH;
-	float offset = 1.0;
-
-	terra->surface_mesh.vcount = 3 * 2 * width * length;
-	terra->surface = calloc(2 * width * length, sizeof(struct triangle));
-
-	vec2 origin = {0.0, 0.0};
-	int ntri = 0;
-	for (int i = 0; i < width; i++) {
-		for (int j = 0; j < length; j++) {
-			terra->surface[ntri].a = sample_height(origin.x+offset, origin.y+offset);
-			terra->surface[ntri].b = sample_height(origin.x+offset, origin.y);
-			terra->surface[ntri].c = sample_height(origin.x, origin.y);
-			ntri++;
-			terra->surface[ntri].a = sample_height(origin.x,origin.y+offset);
-			terra->surface[ntri].b = sample_height(origin.x+offset, origin.y+offset);
-			terra->surface[ntri].c = sample_height(origin.x, origin.y);
-			ntri++;
-
-			origin.x += offset;
-		}
-		origin.x = 0.0;
-		origin.y += offset;
-	}
-
-	vec3 *positions = calloc(terra->surface_mesh.vcount, sizeof(vec3));
-	int n = 0;
-	for (int i = 0; i < 2 * width * length; i++) {
-		positions[n++] = terra->surface[i].a;
-		positions[n++] = terra->surface[i].b;
-		positions[n++] = terra->surface[i].c;
-	}
-
-	glGenVertexArrays(1, &terra->surface_mesh.VAO);
-	glBindVertexArray(terra->surface_mesh.VAO);
-
-	GLuint vbo;
-	glGenBuffers(1, &vbo);
-
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, terra->surface_mesh.vcount * sizeof(vec3), positions, GL_STATIC_DRAW);
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), BUFFER_OFFSET(0));
-
-	glBindVertexArray(0);
-	glDisableVertexAttribArray(0);
-	glDeleteBuffers(1, &vbo);
-
-	free(positions);
-}
-
 struct object make_standard_object(void)
 {
 	struct object obj;
@@ -233,7 +172,7 @@ struct object make_standard_object(void)
 
 	obj.shader = load_shaders(pipeline);
 	obj.m = make_cube_mesh();
-	vec3 center = {5.0, 5.0, 5.0};
+	vec3 center = {25.0, 25.0, 25.0};
 	obj.bbox.c = center;
 	obj.bbox.r[0] = 0.5;
 	obj.bbox.r[1] = 0.5;
@@ -255,7 +194,6 @@ void display_standard_object(struct object *obj)
 {
 	mat4 model = IDENTITY_MATRIX;
 	mat4_translate(&model, obj->bbox.c);
-	model = mat4_rotate_y(model, atanf(box_rotation.x / box_rotation.z));
 
 	glUseProgram(obj->shader);
 	glUniform3fv(glGetUniformLocation(obj->shader, "fcolor"), 1, fcolor.f);
@@ -376,7 +314,6 @@ struct terrain make_terrain(GLuint heightmap)
 	};
 	ter.shader = load_shaders(pipeline);
 	ter.m = make_grid_mesh(TERRAIN_WIDTH,TERRAIN_WIDTH, 1.0);
-	make_terrain_surface(&ter);
 
 	ter.heightmap = heightmap;
 	ter.texture[0] = load_dds_texture("media/texture/grass.dds");
@@ -388,8 +325,6 @@ struct terrain make_terrain(GLuint heightmap)
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(ter.shader);
 	glUniformMatrix4fv(glGetUniformLocation(ter.shader, "project"), 1, GL_FALSE, project.f);
-
-	mountain_range = load_dds_texture("media/texture/mountains.dds");
 
 	return ter;
 }
@@ -422,10 +357,6 @@ void display_terrain(struct terrain *ter)
 	glActiveTexture(GL_TEXTURE5);
 	glBindTexture(GL_TEXTURE_2D, ter->texture[4]);
 
-	glUniform1i(glGetUniformLocation(ter->shader, "range"), 6);
-	glActiveTexture(GL_TEXTURE6);
-	glBindTexture(GL_TEXTURE_2D, mountain_range);
-
 	glBindVertexArray(ter->surface_mesh.VAO);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glDrawArrays(GL_PATCHES, 0, ter->surface_mesh.vcount);
@@ -434,24 +365,21 @@ void display_terrain(struct terrain *ter)
 
 void display_scene(struct scene *scene)
 {
-	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+/*
+	glViewport(0, 0, DTEX_WIDTH, DTEX_HEIGHT);
 	glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	display_terrain(&scene->terrain);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+*/
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	display_terrain(&scene->terrain);
+	//display_terrain(&scene->terrain);
+	//display_water(&scene->water);
 	display_standard_object(&scene->object);
-	glPointSize(3.0);
-	glUseProgram(dot_shader);
-	glBindVertexArray(dotVAO);
-	glDrawArrays(GL_POINTS, 0, 2);
-	display_water(&scene->water);
 	display_skybox(&scene->skybox);
-
 	display_map(&scene->map);
 }
 
@@ -505,46 +433,10 @@ void update_context(struct context *context)
 	fcolor.x = 0.0;
 	fcolor.y = 0.0;
 	fcolor.z = 0.0;
-
-	vec3 intersect = {0.0};
-	vec3 cart = context->scene.object.bbox.c;
-	int width = TERRAIN_WIDTH;
-	int ntriangles = 2 * width * width;
-	float dist = 0;
-	float min = 1000;
-	const float box_speed = 2.0;
 	if (test_ray_AABB(context->camera.eye, context->camera.center, context->scene.object.bbox)) {
 		fcolor.y = 0.5;
 	}
-	if (event.button.button == SDL_BUTTON_RIGHT) {
-		for (int i; i < ntriangles; i++) {
-			if (ray_intersects_triangle(context->camera.eye, context->camera.center, &context->scene.terrain.surface[i], &intersect, &dist)) {
-				if (dist < min) {
-					min = dist;
-					cart = intersect;
-					box_destination = cart;
-					box_velocity = vec3_sub(cart, context->scene.object.bbox.c);
-					box_velocity = vec3_normalize(box_velocity);
-					box_rotation = box_velocity;
-				}
-			}
-		}
-	}
 
-	const vec3 down = {0.0, -1.0, 0.0};
-	vec3 box_ray = {context->scene.object.bbox.c.x, context->scene.object.bbox.c.y + 1.0, context->scene.object.bbox.c.z};
-	for (int i = 0; i < ntriangles; i++) {
-		if (ray_intersects_triangle(box_ray, down, &context->scene.terrain.surface[i], &intersect, &dist)) {
-			context->scene.object.bbox.c = intersect;
-		}
-	}
-	float magn = vec3_magnitude(vec3_sub(box_destination, context->scene.object.bbox.c));
-	if (magn < 0.1) {
-		box_velocity.x = 0.0; box_velocity.y = 0.0; box_velocity.z = 0.0;
-	} else {
-		context->scene.object.bbox.c = vec3_sum(context->scene.object.bbox.c, vec3_scale(context->delta * box_speed, box_velocity));
-	}
-	
 	glUseProgram(context->scene.terrain.shader);
 	glUniformMatrix4fv(glGetUniformLocation(context->scene.terrain.shader, "view"), 1, GL_FALSE, view.f);
 	glUniform3fv(glGetUniformLocation(context->scene.terrain.shader, "view_center"), 1, context->camera.center.f);
@@ -564,36 +456,13 @@ void update_context(struct context *context)
 
 void run_game(SDL_Window *window)
 {
-	struct shader pipeline[] = {
-		{GL_VERTEX_SHADER, "data/shader/dotv.glsl"},
-		{GL_FRAGMENT_SHADER, "data/shader/dotf.glsl"},
-		{GL_NONE, NULL}
-	};
-	dot_shader = load_shaders(pipeline);
 	struct context context = {0};
 	load_scene(&context.scene);
 	context.camera = init_camera(10.0, 8.0, 10.0, 90.0, 0.2);
 	float start, end = 0.0;
 
-	float dot[2] = {0.0, 0.0};
-	glGenVertexArrays(1, &dotVAO);
-	glBindVertexArray(dotVAO);
-
-	GLuint vbo;
-	glGenBuffers(1, &vbo);
-
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, 2 * sizeof(float), dot, GL_STATIC_DRAW);
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
-
-	glBindVertexArray(0);
-	glDisableVertexAttribArray(0);
-	glDeleteBuffers(1, &vbo);
-
-	init_depth_framebuffer();
 	// INITIALIZE DEPTH FRAME BUFFER //
+	init_depth_framebuffer();
 
 	// RENDER LOOP //
 	SDL_SetRelativeMouseMode(SDL_TRUE);

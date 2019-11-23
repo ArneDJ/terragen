@@ -3,7 +3,6 @@
 
 layout(triangles) in;
 uniform sampler2D heightmap;
-uniform sampler2D range;
 uniform sampler2D rivers;
 uniform mat4 view, project;
 uniform float heightmap_scale = 0.015625;
