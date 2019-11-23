@@ -1,6 +1,10 @@
 #version 460 core
 #define PI 3.14159265
 
+uniform sampler2D heightmap;
+
+in vec2 uv;
+
 vec3 fog(vec3 c, float dist, float height)
 {
 	vec3 fog_color = {0.46, 0.7, 0.99};
@@ -46,5 +50,6 @@ vec3 tri_planar_texture(vec3 wnorm, sampler2D samp, vec3 fragpos)
 
 void main(void)
 {
-	gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+	const float texsize = 1.0 / 128.0;
+	gl_FragColor = texture(heightmap, texsize * uv);
 }

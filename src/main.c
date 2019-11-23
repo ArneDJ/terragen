@@ -314,7 +314,7 @@ struct terrain make_terrain(GLuint heightmap)
 	ter.shader = load_shaders(pipeline);
 	ter.m = make_patch_mesh(128,128, 1.0);
 
-	ter.heightmap = heightmap;
+	ter.heightmap = load_dds_texture("media/texture/heightmap.dds");
 	ter.texture[0] = load_dds_texture("media/texture/grass.dds");
 	ter.texture[1] = load_dds_texture("media/texture/rock.dds");
 	ter.texture[2] = load_dds_texture("media/texture/graydirt.dds");
@@ -352,9 +352,9 @@ void display_terrain(struct terrain *ter)
 	glBindTexture(GL_TEXTURE_2D, ter->heightmap);
 
 	glBindVertexArray(ter->m.VAO);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glDrawArrays(GL_PATCHES, 0, ter->m.vcount);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
 void display_scene(struct scene *scene)
