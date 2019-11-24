@@ -312,7 +312,7 @@ struct terrain make_terrain(GLuint heightmap)
 		{GL_NONE, NULL}
 	};
 	ter.shader = load_shaders(pipeline);
-	ter.m = make_patch_mesh(64,64, 4.0);
+	ter.m = make_patch_mesh(128,128, 2.0);
 
 	ter.heightmap = load_dds_texture("media/texture/heightmap.dds");
 	ter.texture[0] = load_dds_texture("media/texture/grass.dds");
