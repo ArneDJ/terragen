@@ -52,4 +52,5 @@ void main(void)
 {
 	const float texsize = 1.0 / 128.0;
 	gl_FragColor = texture(heightmap, texsize * uv);
+	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 }

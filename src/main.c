@@ -280,14 +280,14 @@ struct object make_skybox(void)
 void display_skybox(struct object *sky)
 {
 	glUseProgram(sky->shader);
-	glDisable(GL_CULL_FACE);
+	//glDisable(GL_CULL_FACE);
 	glDepthFunc(GL_LEQUAL);
 
 	glBindVertexArray(sky->m.VAO);
 	glDrawArrays(GL_TRIANGLES, 0, sky->m.vcount);
 
 	glDepthFunc(GL_LESS);
-	glEnable(GL_CULL_FACE);
+	//glEnable(GL_CULL_FACE);
 }
 
 void display_static_object(struct object *obj)
@@ -312,7 +312,7 @@ struct terrain make_terrain(GLuint heightmap)
 		{GL_NONE, NULL}
 	};
 	ter.shader = load_shaders(pipeline);
-	ter.m = make_patch_mesh(128,128, 1.0);
+	ter.m = make_patch_mesh(16,16, 8.0);
 
 	ter.heightmap = load_dds_texture("media/texture/heightmap.dds");
 	ter.texture[0] = load_dds_texture("media/texture/grass.dds");
@@ -352,9 +352,10 @@ void display_terrain(struct terrain *ter)
 	glBindTexture(GL_TEXTURE_2D, ter->heightmap);
 
 	glBindVertexArray(ter->m.VAO);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glDrawArrays(GL_PATCHES, 0, ter->m.vcount);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
 void display_scene(struct scene *scene)
@@ -486,8 +487,8 @@ static SDL_GLContext init_glcontext(SDL_Window *window)
 
 	glClearColor(0,0,0,1);
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-	glFrontFace(GL_CCW);
+	//glEnable(GL_CULL_FACE);
+	//glFrontFace(GL_CCW);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
