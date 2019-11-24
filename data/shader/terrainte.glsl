@@ -4,6 +4,8 @@
 layout(quads, fractional_even_spacing, ccw) in;
 
 out vec2 uv;
+out float height;
+out vec3 fpos;
 
 uniform mat4 view, project;
 uniform sampler2D heightmap;
@@ -14,14 +16,15 @@ void main(void)
 	vec4 p2 = mix(gl_in[2].gl_Position, gl_in[3].gl_Position, gl_TessCoord.y);
 	vec4 pos = mix(p1, p2, gl_TessCoord.x);
 	
-	const float texsize = 1.0 / 128.0;
+	const float texsize = 1.0 / 256.0;
 	vec2 texcoord = pos.xz;
 	uv = texcoord;
-	float height = texture(heightmap, texsize * texcoord).x;
+	height = texture(heightmap, texsize * texcoord).x;
 	pos.y = height;
-	pos.y *= 8.0;
+	pos.y *= 10.0;
 	pos.y += 1.0;
 
+	fpos = pos.xyz;
 	gl_Position = project * view * pos;
 	/*
 	float u = gl_TessCoord.x;

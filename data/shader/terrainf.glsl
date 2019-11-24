@@ -2,8 +2,14 @@
 #define PI 3.14159265
 
 uniform sampler2D heightmap;
+uniform sampler2D grass;
+uniform sampler2D stone;
+uniform sampler2D snow;
+uniform vec3 view_eye;
 
 in vec2 uv;
+in float height;
+in vec3 fpos;
 
 vec3 fog(vec3 c, float dist, float height)
 {
@@ -15,14 +21,15 @@ vec3 fog(vec3 c, float dist, float height)
 	return c * extinction + fog_color * (1.0 - inscattering);
 }
 
-vec3 filter_normal(vec2 uv, float ratio, float ampl, sampler2D heightm)
+vec3 filter_normal(vec2 texcoords, float ratio, float ampl, sampler2D heightm)
 {
 	const ivec3 offset = ivec3(-1, 0, 1);
-	float delta = 24.0 * ampl / textureSize(heightm, 0 ).x;
-	float left = ampl * textureOffset(heightm, uv * ratio, offset.xy).r;
-	float right = ampl * textureOffset(heightm, uv * ratio, offset.zy).r;
-	float top = ampl * textureOffset(heightm, uv * ratio, offset.yz).r;
-	float bottom = ampl * textureOffset(heightm, uv * ratio, offset.yx).r;
+	float detail = 64.0;
+	float delta = detail * ampl / textureSize(heightm, 0 ).x;
+	float left = ampl * textureOffset(heightm, texcoords * ratio, offset.xy).r;
+	float right = ampl * textureOffset(heightm, texcoords * ratio, offset.zy).r;
+	float top = ampl * textureOffset(heightm, texcoords * ratio, offset.yz).r;
+	float bottom = ampl * textureOffset(heightm, texcoords * ratio, offset.yx).r;
 
 	vec3 x = vec3( delta, right - left, 0.0 );
 	vec3 z = vec3( 0.0, top - bottom, delta );
@@ -50,7 +57,26 @@ vec3 tri_planar_texture(vec3 wnorm, sampler2D samp, vec3 fragpos)
 
 void main(void)
 {
-	const float texsize = 1.0 / 128.0;
-	gl_FragColor = texture(heightmap, texsize * uv);
+	const vec3 light_dir = vec3(-1.0, 1.0, -1.0);
+	const float texsize = 1.0 / 256.0;
+	vec3 wnorm = filter_normal(uv, texsize, 8.0, heightmap);
+
+	vec4 grassf = texture(grass, uv);
+	vec3 stonef = tri_planar_texture(wnorm, stone, fpos);
+	vec4 snowf = texture(snow, 0.5 * uv);
+
+	vec3 n = normalize(wnorm);
+	float slope = 1.0 - n.y;
+	float diff = max(dot(n, normalize(light_dir)), 0.0);
+	vec3 material = grassf.xyz;
+	material = mix(material, snowf.xyz, smoothstep(0.3, 0.4 , height));
+	material = mix(material, stonef.xyz, smoothstep(0.1, 0.4, slope));
+	material *= clamp(diff, 0.1, 1.0);
+
+	vec3 view_space = vec3(distance(fpos.x, view_eye.x), distance(fpos.y, view_eye.y), distance(fpos.z, view_eye.z));
+ 	float dist = length(view_space);
+	material = fog(material, dist, fpos.y);
+
+	gl_FragColor = vec4(material, 1.0);
 	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
 }

@@ -136,7 +136,7 @@ struct map make_map(void)
 {
 	struct map map;
 
-	map.m = make_grid_mesh(1, 1, 128.0); 
+	map.m = make_grid_mesh(1, 1, 256.0); 
 
 	struct shader pipeline[] = {
 		{GL_VERTEX_SHADER, "data/shader/mapv.glsl"},
@@ -312,7 +312,7 @@ struct terrain make_terrain(GLuint heightmap)
 		{GL_NONE, NULL}
 	};
 	ter.shader = load_shaders(pipeline);
-	ter.m = make_patch_mesh(8,8, 16.0);
+	ter.m = make_patch_mesh(64,64, 4.0);
 
 	ter.heightmap = load_dds_texture("media/texture/heightmap.dds");
 	ter.texture[0] = load_dds_texture("media/texture/grass.dds");
