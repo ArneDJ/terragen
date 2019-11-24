@@ -4,13 +4,17 @@ layout(vertices = 4) out;
 
 uniform sampler2D heightmap;
 uniform vec2 screen_size = {1920, 1080};
-uniform float lod_factor = 400.0;
+uniform float lod_factor = 1280.0;
 uniform mat4 project, view;
 uniform vec3 view_eye;
 
 float lod(float dist)
 {
-	return clamp(1/dist * lod_factor, 1, 64);
+	//return clamp(1/dist * lod_factor, 1, 64);
+	//return clamp(exp(-0.02 * dist) * lod_factor, 1, 64);
+	float z = length(dist);
+ 	float d = 0.02; // distance factor, if large the terrain will "pop" in more
+ 	return exp(-(d*z)*(d*z)) * lod_factor;
 }
 
 void main(void)
