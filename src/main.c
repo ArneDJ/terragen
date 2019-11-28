@@ -145,7 +145,8 @@ struct map make_map(void)
 	};
 	map.shader = load_shaders(pipeline);
 
-	map.texture = make_voronoi_texture(1024, 1024);
+	//map.texture = make_voronoi_texture(1024, 1024);
+	map.texture = make_worley_texture(1024, 1024);
 
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(map.shader);
@@ -280,14 +281,14 @@ struct object make_skybox(void)
 void display_skybox(struct object *sky)
 {
 	glUseProgram(sky->shader);
-	//glDisable(GL_CULL_FACE);
+	glDisable(GL_CULL_FACE);
 	glDepthFunc(GL_LEQUAL);
 
 	glBindVertexArray(sky->m.VAO);
 	glDrawArrays(GL_TRIANGLES, 0, sky->m.vcount);
 
 	glDepthFunc(GL_LESS);
-	//glEnable(GL_CULL_FACE);
+	glEnable(GL_CULL_FACE);
 }
 
 void display_static_object(struct object *obj)
@@ -487,8 +488,8 @@ static SDL_GLContext init_glcontext(SDL_Window *window)
 
 	glClearColor(0,0,0,1);
 	glEnable(GL_DEPTH_TEST);
-	//glEnable(GL_CULL_FACE);
-	//glFrontFace(GL_CCW);
+	glEnable(GL_CULL_FACE);
+	glFrontFace(GL_CCW);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

@@ -51,6 +51,22 @@ static inline float noise(float x, float y)
 	return smooth(low, high, fract(y));
 }
 
+static inline float mod(float x, float y)
+{
+	return x - y * floorf(x/y);
+}
+
+static inline vec4 permute(vec4 v)
+{
+	vec4 tmp = {
+		mod((34.0 * v.x + 1.0) * v.x, 289.0), 
+		mod((34.0 * v.y + 1.0) * v.y, 289.0), 
+		mod((34.0 * v.z + 1.0) * v.z, 289.0), 
+		mod((34.0 * v.w + 1.0) * v.w, 289.0)
+	};
+	return tmp;
+}
+
 float fbm_noise(float x, float y, float freq, float lacun, float gain) 
 {
 	float n = 0.0;
@@ -67,22 +83,6 @@ float fbm_noise(float x, float y, float freq, float lacun, float gain)
 	}
 
 	return n /= div;
-}
-
-static inline float mod(float x, float y)
-{
-	return x - y * floorf(x/y);
-}
-
-static inline vec4 permute(vec4 v)
-{
-	vec4 tmp = {
-		mod((34.0 * v.x + 1.0) * v.x, 289.0), 
-		mod((34.0 * v.y + 1.0) * v.y, 289.0), 
-		mod((34.0 * v.z + 1.0) * v.z, 289.0), 
-		mod((34.0 * v.w + 1.0) * v.w, 289.0)
-	};
-	return tmp;
 }
 
 float worley_noise(float x, float y)
@@ -112,237 +112,4 @@ float worley_noise(float x, float y)
 	return d.x; // F1 duplicated , F2 not computed
 }
 
-
-
-
-
-
-
-
-#define N_SITES 150
-#define N_CELLS 1000
-#define AA_RES 4 /* average over 4x4 supersampling grid */
-
-static double site[N_SITES][2];
-static unsigned char rgb_v[N_SITES][3];
-static int size_x = 1024, size_y = 1024;
-vec2 cells[N_CELLS];
- 
-static inline double sq2(double x, double y)
-{
-	return x * x + y * y;
-}
- 
-static int nearest_site(double x, double y)
-{
-	int k, ret = 0;
-	double d, dist = 0;
-	for (k = 0; k < N_SITES; k++) {
-		d = sq2(x - site[k][0], y - site[k][1]);
-		if (!k || d < dist) {
-			dist = d, ret = k;
-		}
-	}
-	return ret;
-}
-
-/* see if a pixel is different from any neighboring ones */
-static int at_edge(int *color, int y, int x)
-{
-	int i, j, c = color[y * size_x + x];
-	for (i = y - 1; i <= y + 1; i++) {
-		if (i < 0 || i >= size_y)	
-			continue;
-
-		for (j = x - 1; j <= x + 1; j++) {
-			if (j < 0 || j >= size_x) 
-				continue;
-
-			if (color[i * size_x + j] != c) 
-				return 1;
-		}
-	}
-	return 0;
-}
- 
-static void aa_color(unsigned char *pix, int y, int x)
-{
-	int i, j, n;
-	double r = 0, g = 0, b = 0, xx, yy;
-	for (i = 0; i < AA_RES; i++) {
-		yy = y + 1. / AA_RES * i + .5;
-		for (j = 0; j < AA_RES; j++) {
-			xx = x + 1. / AA_RES * j + .5;
-			n = nearest_site(xx, yy);
-			r += rgb_v[n][0];
-			g += rgb_v[n][1];
-			b += rgb_v[n][2];
-		}
-	}
-	pix[0] = r / (AA_RES * AA_RES);
-	pix[1] = g / (AA_RES * AA_RES);
-	pix[2] = b / (AA_RES * AA_RES);
-}
-
-// Determines how many cells there are
-#define NUM_CELLS 8.0
-
-// Arbitrary random, can be replaced with a function of your choice
-float randv(vec2 co)
-{
-	vec2 xy = {co.y, co.x};
-	vec2 r = {12.9898, 78.233};
-	return fract(sin(vec2_dot(xy ,r)) * 43758.5453);
-}
-
-float vec2_dist(vec2 a, vec2 b)
-{
-	return sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
-}
-
-float vec2_length(vec2 v)
-{
-	return sqrt(v.x * v.x + v.y * v.y);
-}
-
-// Returns the point in a given cell
-vec2 get_cell_point(vec2 cell) {
-	vec2 cell_base = {cell.x / NUM_CELLS, cell.y / NUM_CELLS};
-	float noise_x = randv(cell);
-	vec2 yx = {cell.y, cell.x};
-	float noise_y = randv(yx);
-	vec2 noise = {0.5 + 1.5 * noise_x, 0.5 + 1.5 * noise_y};
-	vec2 point = {cell_base.x + noise.x / NUM_CELLS, cell_base.y + noise.y / NUM_CELLS};
-	return point;
-}
-
-/* DEPCRECATED: TOO SLOW */
-float old_worley_noise(float x, float y) 
-{
-	int xcoord = x * NUM_CELLS;
-	int ycoord = y * NUM_CELLS;
-	float dist = 1.0;
-	vec2 coordv = {x, y};
-
-	// Search in the surrounding 5x5 cell block
-	for (int x = 0; x < 5; x++) {
-		for (int y = 0; y < 5; y++) {
-			vec2 cell = {xcoord + (x - 2), ycoord + (y - 2)};
-			vec2 cell_point = get_cell_point(cell);
-			dist = min(dist, vec2_dist(cell_point, coordv));
-
-		}
-	}
-
-	vec2 len = {1.0 / NUM_CELLS, 1.0 / NUM_CELLS};
-	dist /= vec2_length(len);
-	//dist = 1.0 - sqrt(dist);
-	return dist;
-}
-
-unsigned char *gen_voronoi_map()
-{
-	int k;
-	for (k = 0; k < N_SITES; k++) {
-		site[k][0] = frand(size_x);
-		site[k][1] = frand(size_y);
-		rgb_v[k][0] = frand(256);
-		rgb_v[k][1] = frand(256);
-		rgb_v[k][2] = frand(256);
-	}
-
-	int i, j;
-	int *nearest = malloc(sizeof(int) * size_y * size_x);
-	unsigned char *ptr, *buf, color;
-
-	ptr = buf = malloc(3 * size_x * size_y);
-	for (i = 0; i < size_y; i++) { 
-		for (j = 0; j < size_x; j++) { 
-			nearest[i * size_x + j] = nearest_site(j, i);
-		}
-	}
-
-	for (i = 0; i < size_y; i++) {
-		for (j = 0; j < size_x; j++) {
-			if (!at_edge(nearest, i, j))
-				memcpy(ptr, rgb_v[nearest[i * size_x + j]], 3);
-			else /* at edge, do anti-alias rastering */
-				aa_color(ptr, i, j);
-			ptr += 3;
- 		}
-	}
- 
-	/* draw sites */
-	for (k = 0; k < N_SITES; k++) {
-		color = (rgb_v[k][0]*.25 + rgb_v[k][1]*.6 + rgb_v[k][2]*.15 > 80) ? 0 : 255;
-
-		for (i = site[k][1] - 1; i <= site[k][1] + 1; i++) {
-			if (i < 0 || i >= size_y) 
-				continue;
-
-			for (j = site[k][0] - 1; j <= site[k][0] + 1; j++) {
-				if (j < 0 || j >= size_x) 
-					continue;
-
-				ptr = buf + 3 * (i * size_x + j);
-				ptr[0] = ptr[1] = ptr[2] = color;
-			}
-		}
- 	}
- 
-	return buf;
-}
-
-
-
-static inline float my_worley(float x, float y)
-{
-	float min = 1024;
-	float d;
-	for (int i = 0; i < N_CELLS; i++) {
-		d = sqrt(sq2(x - cells[i].x, y - cells[i].y));				
-		min = min(d, min);
-	}
-	return min;
-}
-
-unsigned char *gen_worley_map()
-{
-	unsigned char *buf = calloc(3 * 1024*1024, sizeof(unsigned char));
-	float z[size_x*size_y];
-	
-	for (int i = 0; i < N_CELLS; i++) {
-		cells[i].x = frand(1024);
-		cells[i].y = frand(1024);
-	}
-
-	clock_t t;
-	t = clock();
-	printf("brute forcing: starts\n");
-
-	float max = 0;
-	int npixel = 0;
-	for(int x = 0; x < size_x; x++) {
-		for(int y = 0; y < size_y; y++) {
-			z[npixel] = my_worley(x, y);
-			max = max(max, z[npixel]);
-			npixel++;
-		}
-	}
-
-	t = clock() - t;
-	double time_taken = ((double)t)/CLOCKS_PER_SEC; // calculate the elapsed time
-	printf("The brute force took %lf seconds to execute\n", time_taken);
-
-	int nbuf = 0;
-	for (int i = 0; i < size_x * size_y; i++) {
-		z[i] /= max;
-		//z[i] = 1.0 - sqrt(z[i]); //if you want steep mountains
-		z[i] = 1.0 - z[i]; //if you want normal mountains
-
-		buf[nbuf++] = 255*z[i]; buf[nbuf++] = 255*z[i]; buf[nbuf++] = 255*z[i];
-	}
-
-	return buf;
-}
 

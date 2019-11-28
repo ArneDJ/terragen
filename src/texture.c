@@ -11,6 +11,7 @@
 
 static GLuint make_rgb_texture(unsigned char *buf, int width, int height);
 static void rgbchannel(rgb *image, unsigned char *buf, int width, int height);
+static unsigned char *gen_worley_map(int size_x, int size_y);
 
 GLuint load_dds_texture(const char *fpath) 
 {
@@ -131,6 +132,16 @@ GLuint make_river_texture(int width, int height)
 	return texnum;
 }
 
+GLuint make_worley_texture(int width, int height)
+{
+	unsigned char *buf = gen_worley_map(width, height);
+	GLuint texnum = make_rgb_texture(buf, width, height);
+
+	free(buf);
+
+	return texnum;
+}
+
 static GLuint make_rgb_texture(unsigned char *buf, int width, int height)
 {
 	GLuint texnum;
@@ -164,3 +175,19 @@ static void rgbchannel(rgb *image, unsigned char *buf, int width, int height)
 	}
 }
 
+static unsigned char *gen_worley_map(int size_x, int size_y)
+{
+	unsigned char *buf = calloc(3 * 1024*1024, sizeof(unsigned char));
+
+	int nbuf = 0;
+	for(int x = 0; x < size_x; x++) {
+		for(int y = 0; y < size_y; y++) {
+			float z = sqrt(worley_noise(0.1*x, 0.1*y));
+			//z[i] = 1.0 - sqrt(z[i]); //if you want steep mountains
+			//z = 1.0 - z; //if you want normal mountains
+			buf[nbuf++] = 255*z; buf[nbuf++] = 255*z; buf[nbuf++] = 255*z;
+		}
+	}
+
+	return buf;
+}
