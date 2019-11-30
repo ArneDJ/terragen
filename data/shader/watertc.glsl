@@ -1,6 +1,6 @@
 #version 460 core
 
-uniform float subdivision = 4.0;
+uniform float subdivision = 1.0;
 layout(vertices = 3) out;
 
 void main(void)

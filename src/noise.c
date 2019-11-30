@@ -6,7 +6,7 @@
 #include "gmath.h"
 #include "noise.h"
 
-#define OCTAVES 4
+#define OCTAVES 5
 static int SEED = 444;
 
 static inline int permutation(int x, int y)

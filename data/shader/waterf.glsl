@@ -82,26 +82,6 @@ void main(void)
 
 	material = pow(material, vec3(1.0/1.5));
 	gl_FragColor = vec4(material, water_depth);
-}
-
-/*
-void main(void)
-{
-	const float penis = 0.015625;
-	//vec4 ftexture = texture(depth_map, vec2(uv.x*1920.0, uv.y*1080.0));
 	//gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-
-	vec2 ndc = (fpos.xy / fpos.w) / 2.0 + 0.5;
-
-	float near = 0.1;
-	float far = 200.0;
-	float depth = texture(water_depth_buffer, ndc).r;
-	float floor_dist = 2.0 * near * far / (far + near - (2.0 * depth - 1.0) * (far - near));
-	depth = gl_FragCoord.z;
-	float water_dist = 2.0 * near * far / (far + near - (2.0 * depth - 1.0) * (far - near));
-	float water_depth = floor_dist - water_dist;
-
-	gl_FragColor = vec4(vec3(water_depth/ 5.0), 1.0);
 }
-*/
 

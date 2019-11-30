@@ -58,8 +58,8 @@ vec3 tri_planar_texture(vec3 wnorm, sampler2D samp, vec3 fragpos)
 void main(void)
 {
 	const vec3 light_dir = vec3(-1.0, 1.0, -1.0);
-	const float texsize = 1.0 / 256.0;
-	vec3 wnorm = filter_normal(uv, texsize, 8.0, heightmap);
+	const float texsize = 1.0 / 64.0;
+	vec3 wnorm = filter_normal(uv, texsize, 1.0, heightmap);
 
 	vec4 grassf = texture(grass, uv);
 	vec3 stonef = tri_planar_texture(wnorm, stone, fpos);
@@ -69,7 +69,7 @@ void main(void)
 	float slope = 1.0 - n.y;
 	float diff = max(dot(n, normalize(light_dir)), 0.0);
 	vec3 material = grassf.xyz;
-	material = mix(material, snowf.xyz, smoothstep(0.3, 0.4 , height));
+	material = mix(material, snowf.xyz, smoothstep(0.6, 0.7 , height));
 	material = mix(material, stonef.xyz, smoothstep(0.1, 0.4, slope));
 	material *= clamp(diff, 0.1, 1.0);
 

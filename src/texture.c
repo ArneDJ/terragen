@@ -14,7 +14,6 @@ static GLuint make_rgb_texture(unsigned char *buf, int width, int height);
 static void rgbchannel(rgb *image, unsigned char *buf, int width, int height);
 static unsigned char *gen_worley_map(int size_x, int size_y);
 static unsigned char *gen_perlin_map(int size_x, int size_y);
-static int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new);
 
 GLuint load_dds_texture(const char *fpath) 
 {
@@ -207,28 +206,14 @@ static unsigned char *gen_worley_map(int size_x, int size_y)
 
 static unsigned char *gen_perlin_map(int size_x, int size_y)
 {
-	unsigned char *buf = calloc(size_x*size_y, sizeof(unsigned char));
+	const size_t len = size_x * size_y;
+	unsigned char *buf = calloc(len, sizeof(unsigned char));
 
 	int nbuf = 0;
 	for(int x = 0; x < size_x; x++) {
 		for(int y = 0; y < size_y; y++) {
-			float z = fbm_noise(x, y, 0.02, 2.5, 2.0);
-			if (z < 0.55) {
-				z = 0.0;
-			} else {
-				z = 1.0;
-			}
-			buf[nbuf++] = 255*z;
-		}
-	}
-
-	unsigned char greyclr = 128.0;
-	for(int x = 0; x < size_x; x++) {
-		for(int y = 0; y < size_y; y++) {
-			int index = y * size_y + x;
-			if (buf[index] == 0.0) {
-				floodfill(x, y, buf, size_x, size_y, buf[index], greyclr);
-			}
+			float z = fbm_noise(0.5*x, 0.5*y, 0.005, 2.5, 2.0);
+			buf[nbuf++] = z * 255.0;
 		}
 	}
 
@@ -252,7 +237,7 @@ static int pop(vec_int_t *stack, int *x, int *y)
 	return 1;
 }
 
-static int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new)
+int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new)
 {
  if(old == new) {
   return 1;

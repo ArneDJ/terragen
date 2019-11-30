@@ -27,3 +27,5 @@ GLuint make_river_texture(int width, int height);
 GLuint make_worley_texture(int width, int height);
 
 GLuint make_perlin_texture(int width, int height);
+
+int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new);

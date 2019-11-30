@@ -27,6 +27,86 @@ static GLuint depth_texture;
 
 static GLuint vao;
 
+static unsigned char *gen_terrain_map(int size_x, int size_y)
+{
+	const size_t len = size_x * size_y;
+	unsigned char *buf = calloc(len, sizeof(unsigned char));
+
+	int nbuf = 0;
+	for(int x = 0; x < size_x; x++) {
+		for(int y = 0; y < size_y; y++) {
+			float z = fbm_noise(0.5*x, 0.5*y, 0.005, 2.5, 2.0);
+			if (z < 0.55) {
+				//z = 0.0;
+				buf[nbuf++] = 0.0;
+			} else {
+				//z = 1.0;
+				buf[nbuf++] = 128.0;
+			}
+		}
+	}
+
+	unsigned char *cpy = calloc(len, sizeof(unsigned char));
+	const unsigned char greyclr = 100.0;
+	const unsigned char lightgrey = 200.0;
+
+	for(int x = 0; x < size_x; x++) {
+		for(int y = 0; y < size_y; y++) {
+			int index = y * size_y + x;
+			if (buf[index] == 128.0) {
+				memcpy(cpy, buf, size_x * size_y);
+				int size = floodfill(x, y, cpy, size_x, size_y, buf[index], greyclr);
+				if (size < 500) {
+					floodfill(x, y, buf, size_x, size_y, buf[index], 0.0);
+				} else {
+					floodfill(x, y, buf, size_x, size_y, buf[index], greyclr);
+				}
+			}
+		} 
+	}
+
+	for (int x = 0; x < size_x; x++) {
+		for (int y = 0; y < size_y; y++) {
+			int index = y * size_y + x;
+			if (buf[index] == 0.0) {
+				memcpy(cpy, buf, size_x * size_y);
+				int size = floodfill(x, y, cpy, size_x, size_y, buf[index], lightgrey);
+				if (size < 50000) {
+					floodfill(x, y, buf, size_x, size_y, buf[index], 128.0);
+				} else {
+					floodfill(x, y, buf, size_x, size_y, buf[index], lightgrey);
+				}
+			}
+
+		}
+	}
+
+	for(int x = 0; x < size_x; x++) {
+		for(int y = 0; y < size_y; y++) {
+			int index = y * size_y + x;
+			if (buf[index] == greyclr) {
+				floodfill(x, y, buf, size_x, size_y, buf[index], 128.0);
+
+			} else if (buf[index] == lightgrey) {
+				floodfill(x, y, buf, size_x, size_y, buf[index], 0.0);
+			}
+		}
+	}
+
+	free(cpy);
+	return buf;
+}
+
+GLuint make_terrain_texture(int width, int height)
+{
+	unsigned char *buf = gen_terrain_map(width, height);
+	GLuint texnum = make_r_texture(buf, width, height);
+
+	free(buf);
+
+	return texnum;
+}
+
 static GLuint init_depth_framebuffer(void)
 {
 	GLuint depth_fbo;
@@ -112,6 +192,7 @@ struct water {
 	GLuint diffuse;
 	GLuint normal;
 	GLuint depthmap;
+	GLuint depth_fbo;
 };
 
 struct scene {
@@ -216,7 +297,7 @@ struct water make_water(GLuint depthmap)
 		{GL_NONE, NULL}
 	};
 	wat.shader = load_shaders(pipeline);
-	wat.m = make_grid_mesh(TERRAIN_WIDTH, TERRAIN_WIDTH, 1.0);
+	wat.m = make_grid_mesh(64, 64, 1.0);
 	wat.depthmap = depthmap;
 	
 	wat.normal = load_dds_texture("media/texture/water_normal.dds");
@@ -242,6 +323,7 @@ void display_water(struct water *wat)
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, depth_texture);
 	glBindVertexArray(wat->m.VAO);
+	glPatchParameteri(GL_PATCH_VERTICES, 3);
 	glDrawArrays(GL_PATCHES, 0, wat->m.vcount);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
@@ -314,11 +396,9 @@ struct terrain make_terrain(GLuint heightmap)
 		{GL_NONE, NULL}
 	};
 	ter.shader = load_shaders(pipeline);
-	ter.m = make_patch_mesh(128,128, 2.0);
+	ter.m = make_patch_mesh(64,64, 1.0);
 
-	//ter.heightmap = load_dds_texture("media/texture/heightmap.dds");
-	//ter.heightmap = make_worley_texture(1024, 1024);
-	ter.heightmap = make_perlin_texture(1024, 1024);
+	ter.heightmap = make_terrain_texture(HEIGHTMAP_RES, HEIGHTMAP_RES);
 	ter.texture[0] = load_dds_texture("media/texture/grass.dds");
 	ter.texture[1] = load_dds_texture("media/texture/rock.dds");
 	ter.texture[2] = load_dds_texture("media/texture/graydirt.dds");
@@ -357,6 +437,7 @@ void display_terrain(struct terrain *ter)
 
 	glBindVertexArray(ter->m.VAO);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPatchParameteri(GL_PATCH_VERTICES, 4);
 	glDrawArrays(GL_PATCHES, 0, ter->m.vcount);
 
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -364,19 +445,17 @@ void display_terrain(struct terrain *ter)
 
 void display_scene(struct scene *scene)
 {
-/*
 	glViewport(0, 0, DTEX_WIDTH, DTEX_HEIGHT);
-	glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, scene->water.depth_fbo);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	display_terrain(&scene->terrain);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-*/
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	//display_terrain(&scene->terrain);
-	//display_water(&scene->water);
+	display_terrain(&scene->terrain);
+	display_water(&scene->water);
 	display_standard_object(&scene->object);
 	display_skybox(&scene->skybox);
 	display_map(&scene->map);
@@ -387,7 +466,7 @@ void load_scene(struct scene *scene)
 
 	scene->skybox = make_skybox();
 	scene->terrain = make_terrain(scene->heightmap);
-	//scene->water = make_water(scene->heightmap);
+	scene->water = make_water(scene->heightmap);
 	scene->object = make_standard_object();
 	scene->map = make_map();
 
@@ -441,7 +520,7 @@ void run_game(SDL_Window *window)
 	load_scene(&context.scene);
 
 	// INITIALIZE DEPTH FRAME BUFFER //
-	GLuint depth_fbo = init_depth_framebuffer();
+	context.scene.water.depth_fbo = init_depth_framebuffer();
 
 	// RENDER LOOP //
 	float start, end = 0.0;
@@ -461,7 +540,7 @@ void run_game(SDL_Window *window)
 		end = start;
 	}
 
-	glDeleteFramebuffers(1, &depth_fbo);
+	glDeleteFramebuffers(1, &context.scene.water.depth_fbo);
 }
 
 static SDL_Window *init_window(int width, int height)
