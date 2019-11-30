@@ -25,3 +25,5 @@ GLuint make_voronoi_texture(int width, int height);
 GLuint make_river_texture(int width, int height);
 
 GLuint make_worley_texture(int width, int height);
+
+GLuint make_perlin_texture(int width, int height);

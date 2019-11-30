@@ -8,10 +8,13 @@
 #include "gmath.h"
 #include "noise.h"
 #include "voronoi.h"
+#include "vec.h"
 
 static GLuint make_rgb_texture(unsigned char *buf, int width, int height);
 static void rgbchannel(rgb *image, unsigned char *buf, int width, int height);
 static unsigned char *gen_worley_map(int size_x, int size_y);
+static unsigned char *gen_perlin_map(int size_x, int size_y);
+static int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new);
 
 GLuint load_dds_texture(const char *fpath) 
 {
@@ -135,7 +138,17 @@ GLuint make_river_texture(int width, int height)
 GLuint make_worley_texture(int width, int height)
 {
 	unsigned char *buf = gen_worley_map(width, height);
-	GLuint texnum = make_rgb_texture(buf, width, height);
+	GLuint texnum = make_r_texture(buf, width, height);
+
+	free(buf);
+
+	return texnum;
+}
+
+GLuint make_perlin_texture(int width, int height)
+{
+	unsigned char *buf = gen_perlin_map(width, height);
+	GLuint texnum = make_r_texture(buf, width, height);
 
 	free(buf);
 
@@ -177,7 +190,7 @@ static void rgbchannel(rgb *image, unsigned char *buf, int width, int height)
 
 static unsigned char *gen_worley_map(int size_x, int size_y)
 {
-	unsigned char *buf = calloc(3 * 1024*1024, sizeof(unsigned char));
+	unsigned char *buf = calloc(size_x*size_y, sizeof(unsigned char));
 
 	int nbuf = 0;
 	for(int x = 0; x < size_x; x++) {
@@ -185,9 +198,107 @@ static unsigned char *gen_worley_map(int size_x, int size_y)
 			float z = sqrt(worley_noise(0.1*x, 0.1*y));
 			//z[i] = 1.0 - sqrt(z[i]); //if you want steep mountains
 			//z = 1.0 - z; //if you want normal mountains
-			buf[nbuf++] = 255*z; buf[nbuf++] = 255*z; buf[nbuf++] = 255*z;
+			buf[nbuf++] = 255*z;
 		}
 	}
 
 	return buf;
 }
+
+static unsigned char *gen_perlin_map(int size_x, int size_y)
+{
+	unsigned char *buf = calloc(size_x*size_y, sizeof(unsigned char));
+
+	int nbuf = 0;
+	for(int x = 0; x < size_x; x++) {
+		for(int y = 0; y < size_y; y++) {
+			float z = fbm_noise(x, y, 0.02, 2.5, 2.0);
+			if (z < 0.55) {
+				z = 0.0;
+			} else {
+				z = 1.0;
+			}
+			buf[nbuf++] = 255*z;
+		}
+	}
+
+	unsigned char greyclr = 128.0;
+	for(int x = 0; x < size_x; x++) {
+		for(int y = 0; y < size_y; y++) {
+			int index = y * size_y + x;
+			if (buf[index] == 0.0) {
+				floodfill(x, y, buf, size_x, size_y, buf[index], greyclr);
+			}
+		}
+	}
+
+	return buf;
+}
+
+static void push(vec_int_t *stack, int x, int y)
+{
+	vec_push(stack, x);
+	vec_push(stack, y);
+}
+
+static int pop(vec_int_t *stack, int *x, int *y)
+{
+	if(stack->length < 2)
+		return 0; // it's empty
+
+	*y = vec_pop(stack);
+	*x = vec_pop(stack);
+
+	return 1;
+}
+
+static int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new)
+{
+ if(old == new) {
+  return 1;
+ }
+
+ int x1;
+ int above, below;
+ int size = 0;
+
+ vec_int_t stack;
+ vec_init(&stack);
+ push(&stack, x, y);
+
+ while(pop(&stack, &x, &y)) {
+  x1 = x;
+
+  while(x1 >= 0 && image[y * width + x1] == old) {
+   x1--;
+  }
+
+  x1++;
+  above = below = 0;
+  while(x1 < width && image[y * width + x1] == old) {
+   image[y * width + x1] = new;
+   size++;
+
+   if(!above && y > 0 && image[(y - 1) * width + x1] == old) {
+    push(&stack, x1, y - 1);
+    above = 1;
+   } else if(above && y > 0 && image[(y - 1) * width + x1] != old) {
+    above = 0;
+   }
+
+   if(!below && y < height - 1 && image[(y + 1) * width + x1] == old) {
+    push(&stack, x1, y + 1);
+    below = 1;
+   }
+   else if(below && y < height - 1 && image[(y + 1) * width + x1] != old) {
+    below = 0;
+   }
+
+   x1++;
+  }
+ }
+
+ vec_deinit(&stack);
+ return size;
+}
+

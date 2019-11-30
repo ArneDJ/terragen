@@ -109,7 +109,7 @@ float worley_noise(float x, float y)
 	d.x = min(d.x, d.z);
 	d.y = min(d.y, d.w);
 	d.x = min(d.x , d.y);
-	return d.x; // F1 duplicated , F2 not computed
+	return clamp(d.x, 0.0, 1.0); // F1 duplicated , F2 not computed
 }
 
 

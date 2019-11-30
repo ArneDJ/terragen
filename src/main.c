@@ -146,7 +146,8 @@ struct map make_map(void)
 	map.shader = load_shaders(pipeline);
 
 	//map.texture = make_voronoi_texture(1024, 1024);
-	map.texture = make_worley_texture(1024, 1024);
+	//map.texture = make_worley_texture(512, 512);
+	map.texture = make_perlin_texture(512, 512);
 
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(map.shader);
@@ -315,7 +316,9 @@ struct terrain make_terrain(GLuint heightmap)
 	ter.shader = load_shaders(pipeline);
 	ter.m = make_patch_mesh(128,128, 2.0);
 
-	ter.heightmap = load_dds_texture("media/texture/heightmap.dds");
+	//ter.heightmap = load_dds_texture("media/texture/heightmap.dds");
+	//ter.heightmap = make_worley_texture(1024, 1024);
+	ter.heightmap = make_perlin_texture(1024, 1024);
 	ter.texture[0] = load_dds_texture("media/texture/grass.dds");
 	ter.texture[1] = load_dds_texture("media/texture/rock.dds");
 	ter.texture[2] = load_dds_texture("media/texture/graydirt.dds");
@@ -372,7 +375,7 @@ void display_scene(struct scene *scene)
 */
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	display_terrain(&scene->terrain);
+	//display_terrain(&scene->terrain);
 	//display_water(&scene->water);
 	display_standard_object(&scene->object);
 	display_skybox(&scene->skybox);
