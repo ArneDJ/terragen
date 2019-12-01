@@ -134,6 +134,16 @@ GLuint make_river_texture(int width, int height)
 	return texnum;
 }
 
+GLuint make_mountain_texture(int width, int height)
+{
+	unsigned char *buf = voronoi_mountains(width, height);
+	GLuint texnum = make_rgb_texture(buf, width, height);
+
+	free(buf);
+
+	return texnum;
+}
+
 GLuint make_worley_texture(int width, int height)
 {
 	unsigned char *buf = gen_worley_map(width, height);

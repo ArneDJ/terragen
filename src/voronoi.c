@@ -118,6 +118,46 @@ static void draw_triangle(const jcv_point *v0, const jcv_point *v1, const jcv_po
 	}
 }
 
+static void draw_dist_triangle(const jcv_point *center, const jcv_point *v1, const jcv_point *v2, unsigned char *image, int width, int height, unsigned char *color)
+{
+	int area = orient(center, v1, v2);
+	if (area == 0)
+		return;
+
+	// Compute triangle bounding box
+	int minX = min3((int)center->x, (int)v1->x, (int)v2->x);
+	int minY = min3((int)center->y, (int)v1->y, (int)v2->y);
+	int maxX = max3((int)center->x, (int)v1->x, (int)v2->x);
+	int maxY = max3((int)center->y, (int)v1->y, (int)v2->y);
+
+	// Clip against screen bounds
+	minX = max(minX, 0);
+	minY = max(minY, 0);
+	maxX = min(maxX, width - 1);
+	maxY = min(maxY, height - 1);
+
+	// Rasterize
+	jcv_point p;
+	for (p.y = (jcv_real)minY; p.y <= maxY; p.y++) {
+		for (p.x = (jcv_real)minX; p.x <= maxX; p.x++) {
+			// Determine barycentric coordinates
+			int w0 = orient(v1, v2, &p);
+			int w1 = orient(v2, center, &p);
+			int w2 = orient(center, v1, &p);
+
+			//unsigned char dist_color = vec2_dist(
+			// If p is on or inside all edges, render pixel.
+			if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
+				vec2 a = {(float)p.x, (float)p.y};
+				vec2 b = {(float)center->x, (float)center->y};
+				float dist = 1.0 - (vec2_dist(a, b) / 150.0);
+				unsigned char dist_color[3] = {255.0*dist, 255.0*dist, 255.0*dist};
+				plot((int)p.x, (int)p.y, image, width, height, dist_color);
+			}
+		}
+	}
+}
+
 void make_river(const jcv_diagram *diagram, unsigned char *image, int width, int height)
 {
 	//frand(time(NULL));
@@ -179,13 +219,40 @@ unsigned char *do_voronoi(int width, int height)
 		const jcv_graphedge *e = site->edges;
 
 		while (e) {
-			draw_triangle(&site->p, &e->pos[0], &e->pos[1], image, width, height, rcolor);
+			draw_dist_triangle(&site->p, &e->pos[0], &e->pos[1], image, width, height, rcolor);
 			e = e->next;
 		}
 	}
 
 	jcv_diagram_free(&diagram);
 	return image;
+}
+
+void make_mountains(const jcv_diagram *diagram, unsigned char *image, int width, int height)
+{
+	//frand(time(NULL));
+    	unsigned char color_line[] = {255.0, 255.0, 255.0};
+	const int MOUNTAIN_RANGE_SIZE = 20;
+	const jcv_site *sites = jcv_diagram_get_sites(diagram);
+	int nsites = diagram->numsites;
+        const jcv_site *site = &sites[rand() % nsites];
+
+	int x[MOUNTAIN_RANGE_SIZE];
+	int y[MOUNTAIN_RANGE_SIZE];
+
+	for (int i = 0; i < MOUNTAIN_RANGE_SIZE; i++) {
+		const jcv_graphedge *e = site->edges;
+		site = e->neighbor;
+		/*
+		x[i] = (int)site->p.x;
+		y[i] = (int)site->p.y;
+		draw_triangle(&site->p, &e->pos[0], &e->pos[1], image, width, height, color_line);
+		*/
+		while (e) {
+			draw_dist_triangle(&site->p, &e->pos[0], &e->pos[1], image, width, height, color_line);
+			e = e->next;
+		}
+	}
 }
 
 unsigned char *voronoi_rivers(int width, int height)
@@ -214,4 +281,27 @@ unsigned char *voronoi_rivers(int width, int height)
 	return image;
 }
 
+unsigned char *voronoi_mountains(int width, int height)
+{
+	frand(time(NULL));
+	unsigned char *image = calloc(3 * width*height, sizeof(unsigned char));
+
+	jcv_point site[NSITES];
+
+	for (int i = 0; i < NSITES; i++) {
+		site[i].x = frand(width);
+		site[i].y = frand(height);
+	}
+
+	jcv_diagram diagram;
+	memset(&diagram, 0, sizeof(jcv_diagram));
+	jcv_diagram_generate(NSITES, site, 0, 0, &diagram);
+
+	for (int i = 0; i < NRIVERS; i++) {
+		make_mountains(&diagram, image, width, height);
+	}
+
+	jcv_diagram_free(&diagram);
+	return image;
+}
 

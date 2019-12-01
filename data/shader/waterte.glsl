@@ -18,7 +18,7 @@ void main(void)
 			gl_TessCoord.z * gl_in[2].gl_Position);
 
 	vec3 wave_pos = gl_Position.xyz;
-	wave_pos.y += 1.0;
+	wave_pos.y += 1.2;
 	uv = wave_pos.xz;
 	fpos = wave_pos;
 	terrain_h = texture(terrain_height, uv * heightmap_scale).r;

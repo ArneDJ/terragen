@@ -5,6 +5,7 @@ uniform sampler2D heightmap;
 uniform sampler2D grass;
 uniform sampler2D stone;
 uniform sampler2D snow;
+uniform sampler2D gravel;
 uniform vec3 view_eye;
 
 in vec2 uv;
@@ -64,14 +65,16 @@ void main(void)
 	vec4 grassf = texture(grass, uv);
 	vec3 stonef = tri_planar_texture(wnorm, stone, fpos);
 	vec4 snowf = texture(snow, 0.5 * uv);
+	vec4 gravelf = texture(gravel, uv);
 
 	vec3 n = normalize(wnorm);
 	float slope = 1.0 - n.y;
 	float diff = max(dot(n, normalize(light_dir)), 0.0);
 	vec3 material = grassf.xyz;
 	material = mix(material, snowf.xyz, smoothstep(0.6, 0.7 , height));
-	material = mix(material, stonef.xyz, smoothstep(0.1, 0.4, slope));
-	material *= clamp(diff, 0.1, 1.0);
+	material = mix(gravelf.xyz, material, smoothstep(0.15, 0.17 , height));
+	material = mix(material, stonef.xyz, smoothstep(0.1, 0.7, slope));
+	material *= clamp(diff, 0.5, 1.0);
 
 	vec3 view_space = vec3(distance(fpos.x, view_eye.x), distance(fpos.y, view_eye.y), distance(fpos.z, view_eye.z));
  	float dist = length(view_space);

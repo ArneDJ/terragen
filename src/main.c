@@ -31,17 +31,24 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 {
 	const size_t len = size_x * size_y;
 	unsigned char *buf = calloc(len, sizeof(unsigned char));
+	float *evaluation = calloc(len, sizeof(float));
+
+	const unsigned char ter_level = 0.25 * 255.0;
+
+	unsigned char *mountainmap = voronoi_mountains(size_x, size_y);
 
 	int nbuf = 0;
+	int neval = 0;
 	for(int x = 0; x < size_x; x++) {
 		for(int y = 0; y < size_y; y++) {
 			float z = fbm_noise(0.5*x, 0.5*y, 0.005, 2.5, 2.0);
+			evaluation[neval++] = z;
 			if (z < 0.55) {
 				//z = 0.0;
 				buf[nbuf++] = 0.0;
 			} else {
 				//z = 1.0;
-				buf[nbuf++] = 128.0;
+				buf[nbuf++] = ter_level;
 			}
 		}
 	}
@@ -53,7 +60,7 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 	for(int x = 0; x < size_x; x++) {
 		for(int y = 0; y < size_y; y++) {
 			int index = y * size_y + x;
-			if (buf[index] == 128.0) {
+			if (buf[index] == ter_level) {
 				memcpy(cpy, buf, size_x * size_y);
 				int size = floodfill(x, y, cpy, size_x, size_y, buf[index], greyclr);
 				if (size < 500) {
@@ -72,7 +79,7 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 				memcpy(cpy, buf, size_x * size_y);
 				int size = floodfill(x, y, cpy, size_x, size_y, buf[index], lightgrey);
 				if (size < 50000) {
-					floodfill(x, y, buf, size_x, size_y, buf[index], 128.0);
+					floodfill(x, y, buf, size_x, size_y, buf[index], ter_level);
 				} else {
 					floodfill(x, y, buf, size_x, size_y, buf[index], lightgrey);
 				}
@@ -85,7 +92,7 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 		for(int y = 0; y < size_y; y++) {
 			int index = y * size_y + x;
 			if (buf[index] == greyclr) {
-				floodfill(x, y, buf, size_x, size_y, buf[index], 128.0);
+				floodfill(x, y, buf, size_x, size_y, buf[index], ter_level);
 
 			} else if (buf[index] == lightgrey) {
 				floodfill(x, y, buf, size_x, size_y, buf[index], 0.0);
@@ -93,7 +100,39 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 		}
 	}
 
+	/*
+	for(int x = 0; x < size_x; x++) {
+		for(int y = 0; y < size_y; y++) {
+			int index = y * size_y + x;
+			if (buf[index] == 0.0) {
+				buf[index] = 255.0 * 0.25 * evaluation[index];
+			}
+		}
+	}
+	*/
+
+	for (int x = 0; x < size_x; x++) {
+		for (int y = 0; y < size_y; y++) {
+			int index = y * size_y + x;
+			int nrange = y * size_y * 3 + x * 3;
+			float mountains = (sqrt(worley_noise(0.01*x, 0.015*y)));
+		//float ridge = sqrt(worley_noise(x * 0.0015, y * 0.001));
+
+			float range = mountainmap[nrange];
+			mountains *= 2.0 * buf[index] / 255.0; 
+
+			mountains *= range;
+		//	mountains *= 0.5;
+
+		//	buf[index] += mountains;
+			mountains *= 1.75 * 255.0;
+			buf[index] = clamp(buf[index]+range, 0.0, 255.0);
+		}
+	}
+
+	free(mountainmap);
 	free(cpy);
+	free(evaluation);
 	return buf;
 }
 
@@ -226,9 +265,11 @@ struct map make_map(void)
 	};
 	map.shader = load_shaders(pipeline);
 
-	//map.texture = make_voronoi_texture(1024, 1024);
+	map.texture = make_voronoi_texture(2048, 2048);
+	//map.texture = make_mountain_texture(2048, 2048);
+	//map.texture = make_river_texture(1024, 1024);
 	//map.texture = make_worley_texture(512, 512);
-	map.texture = make_perlin_texture(512, 512);
+	//map.texture = make_perlin_texture(512, 512);
 
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
 	glUseProgram(map.shader);
@@ -423,7 +464,7 @@ void display_terrain(struct terrain *ter)
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, ter->texture[1]);
 
-	glUniform1i(glGetUniformLocation(ter->shader, "sand"), 2);
+	glUniform1i(glGetUniformLocation(ter->shader, "gravel"), 2);
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, ter->texture[2]);
 
