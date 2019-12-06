@@ -15,6 +15,18 @@ static void rgbchannel(rgb *image, unsigned char *buf, int width, int height);
 static unsigned char *gen_worley_map(int size_x, int size_y);
 static unsigned char *gen_perlin_map(int size_x, int size_y);
 
+void plot(int x, int y, unsigned char *image, int width, int height, int nchannels, unsigned char *color)
+{
+    if( x < 0 || y < 0 || x > (width-1) || y > (height-1) )
+        return;
+    int index = y * width * nchannels + x * nchannels;
+    for( int i = 0; i < nchannels; ++i )
+    {
+        image[index+i] = color[i];
+    }
+}
+
+
 GLuint load_dds_texture(const char *fpath) 
 {
 	GLuint texnum;
@@ -137,8 +149,26 @@ GLuint make_river_texture(int width, int height)
 GLuint make_mountain_texture(int width, int height)
 {
 	unsigned char *buf = voronoi_mountains(width, height);
+
+	 size_t isize = width * height * 3;
+	 unsigned char *cpy = calloc(isize, sizeof(unsigned char));
+
+
+ for (int i = 0; i < 3; i++) {
+ memcpy(cpy, buf, isize);
+ for (int x = 0; x < width; x++) {
+  for (int y = 0; y < height; y++) {
+   unsigned char rgb[3];
+   gauss_filter_rgb(x, y, buf, width, height, rgb);
+   plot(x, y, cpy, width, height, 3, rgb);
+  }
+ }
+ memcpy(buf, cpy, isize);
+ }
+
 	GLuint texnum = make_rgb_texture(buf, width, height);
 
+	free(cpy);
 	free(buf);
 
 	return texnum;
@@ -163,6 +193,52 @@ GLuint make_perlin_texture(int width, int height)
 
 	return texnum;
 }
+
+static void apply_filter_rgb(const unsigned char *image, int width, int height, int x, int y, int xoff, int yoff, float *r, float *g, float *b)
+{
+ if( x+xoff < 0 || y+yoff < 0 || x+xoff > (width-1) || y+yoff > (height-1) )
+         return;
+
+     int index = (y+yoff) * width * 3 + (x+xoff) * 3;
+
+ //int radius = 80;
+ //float stdd = sqrt(-(radius*radius) / (2.0*log10f(1.0 / 255.0)));
+ /* good sigma value: 8.5 */
+ //float gauss = gaussian(xoff, yoff, 8.5);
+ //printf("%f\n", gauss);
+ //
+ float boxk = 1.0 / 448.0;;
+
+ *r += (image[index]/255.f) * boxk;
+ *g += (image[index+1]/255.f) * boxk;
+ *b += (image[index+2]/255.f) * boxk;
+}
+
+void gauss_filter_rgb(int x, int y, const unsigned char *image, int width, int height, unsigned char rgb[3])
+{
+ float red = 0.0;
+ float green = 0.0;
+ float blue = 0.0;
+
+ /* center pixel */
+ /* surrounding pixels */
+ /* good kernel value: 51 , 6 times larger than standard deviation*/
+ const int KERNEL_SIZE = 11;
+
+ for (int kx = -KERNEL_SIZE; kx < KERNEL_SIZE+1; kx++) {
+  for (int ky = -KERNEL_SIZE; ky < KERNEL_SIZE+1; ky++) {
+   apply_filter_rgb(image, width, height, x, y, kx, ky, &red, &green, &blue);
+  }
+ }
+
+ red = clamp(red, 0.0, 1.0);
+ green = clamp(green, 0.0, 1.0);
+ blue = clamp(blue, 0.0, 1.0);
+ rgb[0] = red * 255.0;
+ rgb[1] = green * 255.0;
+ rgb[2] = blue * 255.0;
+}
+
 
 static GLuint make_rgb_texture(unsigned char *buf, int width, int height)
 {

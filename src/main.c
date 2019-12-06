@@ -15,7 +15,7 @@
 #define WINDOW_HEIGHT 1080
 
 #define TERRAIN_WIDTH 64
-#define HEIGHTMAP_RES 2048
+#define HEIGHTMAP_RES 1024
 
 #define DTEX_WIDTH 1024
 #define DTEX_HEIGHT 1024
@@ -35,7 +35,27 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 
 	const unsigned char ter_level = 0.25 * 255.0;
 
-	unsigned char *mountainmap = voronoi_mountains(size_x, size_y);
+	int width = 1024;
+	int height = 1024;
+	unsigned char *mountainmap = voronoi_mountains(width, height);
+	 size_t isize = width * height * 3;
+	 unsigned char *mountain_cpy = calloc(isize, sizeof(unsigned char));
+
+
+	for (int i = 0; i < 3; i++) {
+		memcpy(mountain_cpy, mountainmap, isize);
+		for (int x = 0; x < width; x++) {
+			for (int y = 0; y < height; y++) {
+			unsigned char rgb[3];
+			gauss_filter_rgb(x, y, mountainmap, width, height, rgb);
+			plot(x, y, mountain_cpy, width, height, 3, rgb);
+			}
+		}
+
+ 		memcpy(mountainmap, mountain_cpy, isize);
+	}
+	printf("testpoint\n");
+
 
 	int nbuf = 0;
 	int neval = 0;
@@ -115,22 +135,23 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 		for (int y = 0; y < size_y; y++) {
 			int index = y * size_y + x;
 			int nrange = y * size_y * 3 + x * 3;
-			float mountains = (sqrt(worley_noise(0.01*x, 0.015*y)));
-		//float ridge = sqrt(worley_noise(x * 0.0015, y * 0.001));
+			float mountains = 1.0 - (sqrt(worley_noise(0.02*x, 0.030*y)));
+			float ridge = worley_noise(x * 0.03, y * 0.02);
 
-			float range = mountainmap[nrange];
-			mountains *= 2.0 * buf[index] / 255.0; 
+			float range = mountainmap[nrange]/255.f;
 
 			mountains *= range;
-		//	mountains *= 0.5;
+			mountains *= 255.0 * 0.5;
 
-		//	buf[index] += mountains;
-			mountains *= 1.75 * 255.0;
-			buf[index] = clamp(buf[index]+range, 0.0, 255.0);
+			ridge *= range;
+			ridge *= 255.0 * 0.8;
+
+			buf[index] = clamp(buf[index]+ridge+mountains, 0.0, 255.0);
 		}
 	}
 
 	free(mountainmap);
+	free(mountain_cpy);
 	free(cpy);
 	free(evaluation);
 	return buf;
@@ -266,7 +287,7 @@ struct map make_map(void)
 	map.shader = load_shaders(pipeline);
 
 	map.texture = make_voronoi_texture(2048, 2048);
-	//map.texture = make_mountain_texture(2048, 2048);
+	//map.texture = make_mountain_texture(1024, 1024);
 	//map.texture = make_river_texture(1024, 1024);
 	//map.texture = make_worley_texture(512, 512);
 	//map.texture = make_perlin_texture(512, 512);

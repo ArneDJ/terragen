@@ -281,9 +281,70 @@ unsigned char *voronoi_rivers(int width, int height)
 	return image;
 }
 
+// Remaps the point from the input space to image space
+static inline jcv_point remap(const jcv_point* pt, const jcv_point* min, const jcv_point* max, int width, int height)
+{
+    jcv_point p;
+    p.x = (pt->x - min->x)/(max->x - min->x) * (jcv_real)width;
+    p.y = (pt->y - min->y)/(max->y - min->y) * (jcv_real)height;
+    return p;
+}
+
+
+void draw_mountains(const jcv_diagram *diagram, unsigned char *image, int width, int height)
+{
+ unsigned char rgb[] = {255.0, 255.0, 255.0};
+ const jcv_site *sites = jcv_diagram_get_sites(diagram);
+ int nsites = diagram->numsites;
+  int start_site = rand() % nsites;
+  printf("picking start site: %d\n", start_site);
+
+        const jcv_site *site = &sites[start_site];
+
+ int i = 0;
+ while (i < 50) {
+  /* color cell */
+  const jcv_graphedge *ge = site->edges;
+  jcv_point s = remap(&site->p, &diagram->min, &diagram->max, width, height);
+  while (ge) {
+   jcv_point p0 = remap(&ge->pos[0], &diagram->min, &diagram->max, width, height);
+   jcv_point p1 = remap(&ge->pos[1], &diagram->min, &diagram->max, width, height);
+
+   draw_triangle( &s, &p0, &p1, image, width, height, &rgb[0]);
+   ge = ge->next;
+  }
+
+  /* find a neighbouring cell */
+  const jcv_graphedge *e = site->edges;
+  float dist = 0.0;
+  while (e) {
+	vec2 e1 = {e->pos[0].x, e->pos[0].y};
+	vec2 e2 = {e->pos[1].x, e->pos[1].y};
+   dist = vec2_dist(e1, e2);
+   if (dist > 10) {
+    break;
+   }
+
+   e = e->next;
+  }
+
+  if (!e) {
+   printf("UH OH\n");
+   break;
+  }
+
+  site = e->neighbor;
+
+  i++;
+ }
+}
+
+
 unsigned char *voronoi_mountains(int width, int height)
 {
 	frand(time(NULL));
+	srand(time(0)); 
+
 	unsigned char *image = calloc(3 * width*height, sizeof(unsigned char));
 
 	jcv_point site[NSITES];
@@ -297,9 +358,8 @@ unsigned char *voronoi_mountains(int width, int height)
 	memset(&diagram, 0, sizeof(jcv_diagram));
 	jcv_diagram_generate(NSITES, site, 0, 0, &diagram);
 
-	for (int i = 0; i < NRIVERS; i++) {
-		make_mountains(&diagram, image, width, height);
-	}
+	draw_mountains(&diagram, image, width, height);
+	draw_mountains(&diagram, image, width, height);
 
 	jcv_diagram_free(&diagram);
 	return image;

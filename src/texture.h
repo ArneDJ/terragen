@@ -30,4 +30,8 @@ GLuint make_worley_texture(int width, int height);
 
 GLuint make_perlin_texture(int width, int height);
 
+void plot(int x, int y, unsigned char *image, int width, int height, int nchannels, unsigned char *color);
+
 int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new);
+
+void gauss_filter_rgb(int x, int y, const unsigned char *image, int width, int height, unsigned char rgb[3]);

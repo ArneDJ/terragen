@@ -71,7 +71,7 @@ void main(void)
 	float slope = 1.0 - n.y;
 	float diff = max(dot(n, normalize(light_dir)), 0.0);
 	vec3 material = grassf.xyz;
-	material = mix(material, snowf.xyz, smoothstep(0.6, 0.7 , height));
+	material = mix(material, snowf.xyz, smoothstep(0.4, 0.6 , height));
 	material = mix(gravelf.xyz, material, smoothstep(0.15, 0.17 , height));
 	material = mix(material, stonef.xyz, smoothstep(0.1, 0.7, slope));
 	material *= clamp(diff, 0.5, 1.0);
