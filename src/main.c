@@ -131,6 +131,19 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 	}
 	*/
 
+	unsigned char *riverbuf = voronoi_rivers(width, height);
+
+	unsigned char *rivercpy = calloc(3 * width * height, sizeof(unsigned char));
+	memcpy(rivercpy, riverbuf, 3 * width * height);
+	for (int x = 0; x < width; x++) {
+		for (int y = 0; y < width; y++) {
+			unsigned char rgb[3];
+			gauss_filter_rgb(x, y, riverbuf, width, height, rgb);
+			plot(x, y, rivercpy, width, height, 3, rgb);
+		}
+	}
+	memcpy(riverbuf, rivercpy, 3 * width * height);
+
 	for (int x = 0; x < size_x; x++) {
 		for (int y = 0; y < size_y; y++) {
 			int index = y * size_y + x;
@@ -141,15 +154,21 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 			float range = mountainmap[nrange]/255.f;
 
 			mountains *= range;
-			mountains *= 255.0 * 0.5;
+			mountains *= 255.0 * 0.2;
 
 			ridge *= range;
-			ridge *= 255.0 * 0.8;
+			ridge *= 255.0 * 0.5;
 
+			buf[index] *= riverbuf[nrange]/255.f;
+			float detail = 0.15 * fbm_noise(x, y, 0.01, 2.5, 2.0);
+			buf[index] += (detail*255.0);
 			buf[index] = clamp(buf[index]+ridge+mountains, 0.0, 255.0);
 		}
 	}
 
+
+	free(riverbuf);
+	free(rivercpy);
 	free(mountainmap);
 	free(mountain_cpy);
 	free(cpy);
@@ -286,9 +305,9 @@ struct map make_map(void)
 	};
 	map.shader = load_shaders(pipeline);
 
-	map.texture = make_voronoi_texture(2048, 2048);
+	//map.texture = make_voronoi_texture(2048, 2048);
 	//map.texture = make_mountain_texture(1024, 1024);
-	//map.texture = make_river_texture(1024, 1024);
+	map.texture = make_river_texture(1024, 1024);
 	//map.texture = make_worley_texture(512, 512);
 	//map.texture = make_perlin_texture(512, 512);
 

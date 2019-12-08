@@ -139,8 +139,21 @@ GLuint make_voronoi_texture(int width, int height)
 GLuint make_river_texture(int width, int height)
 {
 	unsigned char *buf = voronoi_rivers(width, height);
+
+	unsigned char *cpy = calloc(3 * width * height, sizeof(unsigned char));
+	memcpy(cpy, buf, 3 * width * height);
+	for (int x = 0; x < width; x++) {
+		for (int y = 0; y < width; y++) {
+			unsigned char rgb[3];
+			gauss_filter_rgb(x, y, buf, width, height, rgb);
+			plot(x, y, cpy, width, height, 3, rgb);
+		}
+	}
+	memcpy(buf, cpy, 3 * width * height);
+
 	GLuint texnum = make_rgb_texture(buf, width, height);
 
+	free(cpy);
 	free(buf);
 
 	return texnum;

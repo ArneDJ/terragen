@@ -60,7 +60,7 @@ void main(void)
 	uv = texcoord;
 	height = texture(heightmap, texsize * texcoord).x;
 	pos.y = height;
-	pos.y *= 2.0;
+	pos.y *= 4.0;
 	pos.y += 1.0;
 //	pos.y += 1.5 * fbm(0.2*pos.xz);
 

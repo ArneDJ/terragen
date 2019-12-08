@@ -161,7 +161,7 @@ static void draw_dist_triangle(const jcv_point *center, const jcv_point *v1, con
 void make_river(const jcv_diagram *diagram, unsigned char *image, int width, int height)
 {
 	//frand(time(NULL));
-    	unsigned char color_line[] = {150, 150, 150};
+    	unsigned char color_line[] = {0.0, 0.0, 0.0};
 	const int RIVER_SIZE = 20;
 	const jcv_site *sites = jcv_diagram_get_sites(diagram);
 	int nsites = diagram->numsites;
@@ -178,7 +178,7 @@ void make_river(const jcv_diagram *diagram, unsigned char *image, int width, int
 	}
 
 	for (int i = 0; i < RIVER_SIZE-1; i++) {
-		draw_thick_line(x[i], y[i], x[i+1], y[i+1], image, width, height, color_line, 32.0);
+		draw_thick_line(x[i], y[i], x[i+1], y[i+1], image, width, height, color_line, 24.0);
 	}
 
 }
