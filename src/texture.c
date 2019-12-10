@@ -9,23 +9,12 @@
 #include "noise.h"
 #include "voronoi.h"
 #include "vec.h"
+#include "imp.h"
 
 static GLuint make_rgb_texture(unsigned char *buf, int width, int height);
 static void rgbchannel(rgb *image, unsigned char *buf, int width, int height);
 static unsigned char *gen_worley_map(int size_x, int size_y);
 static unsigned char *gen_perlin_map(int size_x, int size_y);
-
-void plot(int x, int y, unsigned char *image, int width, int height, int nchannels, unsigned char *color)
-{
-    if( x < 0 || y < 0 || x > (width-1) || y > (height-1) )
-        return;
-    int index = y * width * nchannels + x * nchannels;
-    for( int i = 0; i < nchannels; ++i )
-    {
-        image[index+i] = color[i];
-    }
-}
-
 
 GLuint load_dds_texture(const char *fpath) 
 {
@@ -207,52 +196,6 @@ GLuint make_perlin_texture(int width, int height)
 	return texnum;
 }
 
-static void apply_filter_rgb(const unsigned char *image, int width, int height, int x, int y, int xoff, int yoff, float *r, float *g, float *b)
-{
- if( x+xoff < 0 || y+yoff < 0 || x+xoff > (width-1) || y+yoff > (height-1) )
-         return;
-
-     int index = (y+yoff) * width * 3 + (x+xoff) * 3;
-
- //int radius = 80;
- //float stdd = sqrt(-(radius*radius) / (2.0*log10f(1.0 / 255.0)));
- /* good sigma value: 8.5 */
- //float gauss = gaussian(xoff, yoff, 8.5);
- //printf("%f\n", gauss);
- //
- float boxk = 1.0 / 448.0;;
-
- *r += (image[index]/255.f) * boxk;
- *g += (image[index+1]/255.f) * boxk;
- *b += (image[index+2]/255.f) * boxk;
-}
-
-void gauss_filter_rgb(int x, int y, const unsigned char *image, int width, int height, unsigned char rgb[3])
-{
- float red = 0.0;
- float green = 0.0;
- float blue = 0.0;
-
- /* center pixel */
- /* surrounding pixels */
- /* good kernel value: 51 , 6 times larger than standard deviation*/
- const int KERNEL_SIZE = 11;
-
- for (int kx = -KERNEL_SIZE; kx < KERNEL_SIZE+1; kx++) {
-  for (int ky = -KERNEL_SIZE; ky < KERNEL_SIZE+1; ky++) {
-   apply_filter_rgb(image, width, height, x, y, kx, ky, &red, &green, &blue);
-  }
- }
-
- red = clamp(red, 0.0, 1.0);
- green = clamp(green, 0.0, 1.0);
- blue = clamp(blue, 0.0, 1.0);
- rgb[0] = red * 255.0;
- rgb[1] = green * 255.0;
- rgb[2] = blue * 255.0;
-}
-
-
 static GLuint make_rgb_texture(unsigned char *buf, int width, int height)
 {
 	GLuint texnum;
@@ -317,72 +260,5 @@ static unsigned char *gen_perlin_map(int size_x, int size_y)
 	}
 
 	return buf;
-}
-
-static void push(vec_int_t *stack, int x, int y)
-{
-	vec_push(stack, x);
-	vec_push(stack, y);
-}
-
-static int pop(vec_int_t *stack, int *x, int *y)
-{
-	if(stack->length < 2)
-		return 0; // it's empty
-
-	*y = vec_pop(stack);
-	*x = vec_pop(stack);
-
-	return 1;
-}
-
-int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new)
-{
- if(old == new) {
-  return 1;
- }
-
- int x1;
- int above, below;
- int size = 0;
-
- vec_int_t stack;
- vec_init(&stack);
- push(&stack, x, y);
-
- while(pop(&stack, &x, &y)) {
-  x1 = x;
-
-  while(x1 >= 0 && image[y * width + x1] == old) {
-   x1--;
-  }
-
-  x1++;
-  above = below = 0;
-  while(x1 < width && image[y * width + x1] == old) {
-   image[y * width + x1] = new;
-   size++;
-
-   if(!above && y > 0 && image[(y - 1) * width + x1] == old) {
-    push(&stack, x1, y - 1);
-    above = 1;
-   } else if(above && y > 0 && image[(y - 1) * width + x1] != old) {
-    above = 0;
-   }
-
-   if(!below && y < height - 1 && image[(y + 1) * width + x1] == old) {
-    push(&stack, x1, y + 1);
-    below = 1;
-   }
-   else if(below && y < height - 1 && image[(y + 1) * width + x1] != old) {
-    below = 0;
-   }
-
-   x1++;
-  }
- }
-
- vec_deinit(&stack);
- return size;
 }
 

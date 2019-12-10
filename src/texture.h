@@ -34,4 +34,3 @@ void plot(int x, int y, unsigned char *image, int width, int height, int nchanne
 
 int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new);
 
-void gauss_filter_rgb(int x, int y, const unsigned char *image, int width, int height, unsigned char rgb[3]);

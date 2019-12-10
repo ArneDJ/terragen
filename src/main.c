@@ -10,6 +10,7 @@
 #include "texture.h"
 #include "noise.h"
 #include "voronoi.h"
+#include "imp.h"
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
@@ -305,9 +306,9 @@ struct map make_map(void)
 	};
 	map.shader = load_shaders(pipeline);
 
-	//map.texture = make_voronoi_texture(2048, 2048);
+	map.texture = make_voronoi_texture(2048, 2048);
 	//map.texture = make_mountain_texture(1024, 1024);
-	map.texture = make_river_texture(1024, 1024);
+	//map.texture = make_river_texture(1024, 1024);
 	//map.texture = make_worley_texture(512, 512);
 	//map.texture = make_perlin_texture(512, 512);
 
