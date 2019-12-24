@@ -11,6 +11,8 @@
 #include "noise.h"
 #include "voronoi.h"
 #include "imp.h"
+#define IIR_GAUSS_BLUR_IMPLEMENTATION
+#include "gauss.h"
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
@@ -43,19 +45,7 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 	 unsigned char *mountain_cpy = calloc(isize, sizeof(unsigned char));
 
 
-	for (int i = 0; i < 3; i++) {
-		memcpy(mountain_cpy, mountainmap, isize);
-		for (int x = 0; x < width; x++) {
-			for (int y = 0; y < height; y++) {
-			unsigned char rgb[3];
-			gauss_filter_rgb(x, y, mountainmap, width, height, rgb);
-			plot(x, y, mountain_cpy, width, height, 3, rgb);
-			}
-		}
-
- 		memcpy(mountainmap, mountain_cpy, isize);
-	}
-	printf("testpoint\n");
+	iir_gauss_blur(width, height, 3, mountainmap, 10.0);
 
 
 	int nbuf = 0;
