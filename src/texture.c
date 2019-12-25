@@ -6,8 +6,6 @@
 #include <GL/gl.h>
 #include "texture.h"
 #include "gmath.h"
-#include "noise.h"
-#include "vec.h"
 #include "imp.h"
 
 static GLuint make_rgb_texture(unsigned char *buf, int width, int height);
@@ -116,7 +114,8 @@ GLuint make_r_texture(unsigned char *image, int width, int height)
 
 GLuint make_voronoi_texture(int width, int height)
 {
-	unsigned char *buf = do_voronoi(width, height);
+	unsigned char *buf = calloc(width * height * 3, sizeof(unsigned char));
+	do_voronoi(width, height, buf);
 	GLuint texnum = make_rgb_texture(buf, width, height);
 
 	free(buf);
@@ -126,22 +125,10 @@ GLuint make_voronoi_texture(int width, int height)
 
 GLuint make_river_texture(int width, int height)
 {
-	unsigned char *buf = voronoi_rivers(width, height);
-
-	unsigned char *cpy = calloc(3 * width * height, sizeof(unsigned char));
-	memcpy(cpy, buf, 3 * width * height);
-	for (int x = 0; x < width; x++) {
-		for (int y = 0; y < width; y++) {
-			unsigned char rgb[3];
-			gauss_filter_rgb(x, y, buf, width, height, rgb);
-			plot(x, y, cpy, width, height, 3, rgb);
-		}
-	}
-	memcpy(buf, cpy, 3 * width * height);
-
+	unsigned char *buf = calloc(width * height * 3, sizeof(unsigned char));
+	voronoi_rivers(width, height, buf);
 	GLuint texnum = make_rgb_texture(buf, width, height);
 
-	free(cpy);
 	free(buf);
 
 	return texnum;
@@ -149,27 +136,13 @@ GLuint make_river_texture(int width, int height)
 
 GLuint make_mountain_texture(int width, int height)
 {
-	unsigned char *buf = voronoi_mountains(width, height);
+	unsigned char *buf = calloc(width * height * 3, sizeof(unsigned char));
+	voronoi_mountains(width, height, buf);
 
 	 size_t isize = width * height * 3;
-	 unsigned char *cpy = calloc(isize, sizeof(unsigned char));
-
-
- for (int i = 0; i < 3; i++) {
- memcpy(cpy, buf, isize);
- for (int x = 0; x < width; x++) {
-  for (int y = 0; y < height; y++) {
-   unsigned char rgb[3];
-   gauss_filter_rgb(x, y, buf, width, height, rgb);
-   plot(x, y, cpy, width, height, 3, rgb);
-  }
- }
- memcpy(buf, cpy, isize);
- }
 
 	GLuint texnum = make_rgb_texture(buf, width, height);
 
-	free(cpy);
 	free(buf);
 
 	return texnum;

@@ -8,7 +8,6 @@
 #include "mesh.h"
 #include "camera.h"
 #include "texture.h"
-#include "noise.h"
 #include "imp.h"
 #define IIR_GAUSS_BLUR_IMPLEMENTATION
 #include "gauss.h"
@@ -39,7 +38,9 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 
 	int width = 1024;
 	int height = 1024;
-	unsigned char *mountainmap = voronoi_mountains(width, height);
+	unsigned char *mountainmap = calloc(width * height * 3, sizeof(unsigned char));
+	voronoi_mountains(width, height, mountainmap);
+
 	 size_t isize = width * height * 3;
 	 unsigned char *mountain_cpy = calloc(isize, sizeof(unsigned char));
 
@@ -121,18 +122,8 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 	}
 	*/
 
-	unsigned char *riverbuf = voronoi_rivers(width, height);
-
-	unsigned char *rivercpy = calloc(3 * width * height, sizeof(unsigned char));
-	memcpy(rivercpy, riverbuf, 3 * width * height);
-	for (int x = 0; x < width; x++) {
-		for (int y = 0; y < width; y++) {
-			unsigned char rgb[3];
-			gauss_filter_rgb(x, y, riverbuf, width, height, rgb);
-			plot(x, y, rivercpy, width, height, 3, rgb);
-		}
-	}
-	memcpy(riverbuf, rivercpy, 3 * width * height);
+	unsigned char *riverbuf = calloc(width * height * 3, sizeof(unsigned char));
+	voronoi_rivers(width, height, riverbuf);
 
 	for (int x = 0; x < size_x; x++) {
 		for (int y = 0; y < size_y; y++) {
@@ -158,7 +149,6 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 
 
 	free(riverbuf);
-	free(rivercpy);
 	free(mountainmap);
 	free(mountain_cpy);
 	free(cpy);
