@@ -7,7 +7,6 @@
 #include "texture.h"
 #include "gmath.h"
 #include "noise.h"
-#include "voronoi.h"
 #include "vec.h"
 #include "imp.h"
 

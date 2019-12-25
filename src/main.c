@@ -9,7 +9,6 @@
 #include "camera.h"
 #include "texture.h"
 #include "noise.h"
-#include "voronoi.h"
 #include "imp.h"
 #define IIR_GAUSS_BLUR_IMPLEMENTATION
 #include "gauss.h"
@@ -45,7 +44,7 @@ static unsigned char *gen_terrain_map(int size_x, int size_y)
 	 unsigned char *mountain_cpy = calloc(isize, sizeof(unsigned char));
 
 
-	iir_gauss_blur(width, height, 3, mountainmap, 10.0);
+	iir_gauss_blur(width, height, 3, mountainmap, 5.0);
 
 
 	int nbuf = 0;
@@ -520,14 +519,14 @@ void display_scene(struct scene *scene)
 	glViewport(0, 0, DTEX_WIDTH, DTEX_HEIGHT);
 	glBindFramebuffer(GL_FRAMEBUFFER, scene->water.depth_fbo);
 	glClear(GL_DEPTH_BUFFER_BIT);
-	display_terrain(&scene->terrain);
+//	display_terrain(&scene->terrain);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	display_terrain(&scene->terrain);
-	display_water(&scene->water);
+//	display_terrain(&scene->terrain);
+//	display_water(&scene->water);
 	display_standard_object(&scene->object);
 	display_skybox(&scene->skybox);
 	display_map(&scene->map);
@@ -537,8 +536,8 @@ void load_scene(struct scene *scene)
 {
 
 	scene->skybox = make_skybox();
-	scene->terrain = make_terrain(scene->heightmap);
-	scene->water = make_water(scene->heightmap);
+//	scene->terrain = make_terrain(scene->heightmap);
+//	scene->water = make_water(scene->heightmap);
 	scene->object = make_standard_object();
 	scene->map = make_map();
 
@@ -585,7 +584,7 @@ void update_context(struct context *context)
 	glUniformMatrix4fv(glGetUniformLocation(context->scene.skybox.shader, "view"), 1, GL_FALSE, skybox_view.f);
 }
 
-void run_game(SDL_Window *window)
+void run_loop(SDL_Window *window)
 {
 	struct context context = {0};
 	context.camera = init_camera(10.0, 8.0, 10.0, 90.0, 0.2);
@@ -656,7 +655,7 @@ int main(int argc, char *argv[])
 	SDL_Window *window = init_window(WINDOW_WIDTH, WINDOW_HEIGHT);
 	SDL_GLContext glcontext = init_glcontext(window);
 
-	run_game(window);
+	run_loop(window);
 
 	SDL_GL_DeleteContext(glcontext);
 	SDL_DestroyWindow(window);
