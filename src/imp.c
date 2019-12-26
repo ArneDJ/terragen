@@ -24,7 +24,7 @@ static inline int permutation(int x, int y);
 
 static const int SEED = 444;
 
-void plot(int x, int y, unsigned char *image, int width, int height, int nchannels, unsigned char color[3])
+void plot(int x, int y, unsigned char *image, int width, int height, int nchannels, unsigned char *color)
 {
 	if (x < 0 || y < 0 || x > (width-1) || y > (height-1)) {
 		return;
@@ -45,7 +45,7 @@ void draw_line(int x0, int y0, int x1, int y1, unsigned char *image, int width, 
 	int err = dx+dy, e2; // error value e_xy
 
 	for(;;) {
-		plot(x0,y0, image, width, height, 3, color);
+		plot(x0,y0, image, width, height, nchannels, color);
 		if (x0==x1 && y0==y1)
 			break;
 		e2 = 2*err;

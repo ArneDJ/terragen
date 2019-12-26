@@ -8,6 +8,7 @@
 #include "shader.h"
 #include "texture.h"
 #include "imp.h"
+#include "voronoi.h"
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
@@ -35,7 +36,6 @@ static GLuint make_terrain(unsigned int res)
 	const int MIN_ISLAND_SIZE = res;
 	const unsigned char red = 255.0;
 	const unsigned char black = 0.0;
-	const unsigned char half = 125.0;
 
 	/* remove small lakes */
 	memcpy(cpy, image, size);
@@ -61,9 +61,47 @@ static GLuint make_terrain(unsigned int res)
 		}
 	}
 
+	/* generate site points */
+	const int MAX_SITES = 500;
+	jcv_point site[MAX_SITES];
+
+	int nsite = 0;
+	while (nsite < MAX_SITES) {
+		float x = frand(res);
+		float y = frand(res);
+		int index = (int)y * res + (int)x;
+		if (image[index] == red) {
+			site[nsite].x = x;
+			site[nsite].y = y;
+			nsite++;
+		}
+	}
+
+	jcv_diagram diagram;
+	memset(&diagram, 0, sizeof(jcv_diagram));
+	jcv_diagram_generate(MAX_SITES, site, 0, 0, &diagram);
+
+	/* plot the sites */
+	unsigned char sitecolor = 155.0;
+	const jcv_site *sites = jcv_diagram_get_sites(&diagram);
+	for (int i = 0; i < diagram.numsites; i++) {
+		const jcv_site *site = &sites[i];
+		jcv_point p = site->p;
+
+		plot((int)p.x, (int)p.y, image, res, res, 1, &sitecolor);
+	}
+
+	        // If all you need are the edges
+        const jcv_edge *edge = jcv_diagram_get_edges(&diagram);
+        while (edge) {
+		draw_line((int)edge->pos[0].x, (int)edge->pos[0].y, (int)edge->pos[1].x, (int)edge->pos[1].y, image, res, res, 1, &sitecolor);
+		edge = jcv_diagram_get_next_edge(edge);
+        }
+
 
 	GLuint texnum = make_r_texture(image, res, res);
 
+	jcv_diagram_free(&diagram);
 	free(image);
 	free(cpy);
 	return texnum;

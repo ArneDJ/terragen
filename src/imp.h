@@ -8,7 +8,7 @@ struct image {
 	size_t size; /* size in bytes */
 };
 
-void plot(int x, int y, unsigned char *image, int width, int height, int nchannels, unsigned char color[3]);
+void plot(int x, int y, unsigned char *image, int width, int height, int nchannels, unsigned char *color);
 
 int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new);
 
