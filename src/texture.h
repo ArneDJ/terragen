@@ -29,3 +29,5 @@ GLuint make_river_texture(int width, int height);
 GLuint make_worley_texture(int width, int height);
 
 GLuint make_perlin_texture(int width, int height);
+
+GLuint init_depth_framebuffer(GLuint depth_texture, int width, int height);
