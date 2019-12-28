@@ -66,6 +66,7 @@ float clamp(float n, float min, float max);
 float smoothstep(float min, float max, float x);
 
 float vec2_dot(vec2 a, vec2 b);
+float vec2_dist(vec2 a, vec2 b);
 
 vec3 vec3_make(float x, float y, float z);
 vec3 vec3_scale(float s, vec3 v);

@@ -1,9 +1,7 @@
 typedef unsigned char rgb[3];
 
 enum {
-	FOURCC_DXT1 = 0x31545844,
-	FOURCC_DXT3 = 0x33545844,
-	FOURCC_DXT5 = 0x35545844,
+	FOURCC_DXT1 = 0x31545844, FOURCC_DXT3 = 0x33545844, FOURCC_DXT5 = 0x35545844,
 };
 
 /* DDS header */
@@ -22,10 +20,13 @@ GLuint make_r_texture(unsigned char *image, int width, int height);
 
 GLuint make_voronoi_texture(int width, int height);
 
+GLuint make_mountain_texture(int width, int height);
+
 GLuint make_river_texture(int width, int height);
 
 GLuint make_worley_texture(int width, int height);
 
 GLuint make_perlin_texture(int width, int height);
 
-int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new);
+//GLuint init_depth_framebuffer(GLuint depth_texture, int width, int height);
+GLuint init_depth_framebuffer(GLuint *depth_texture, int width, int height);

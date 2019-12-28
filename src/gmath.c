@@ -48,6 +48,11 @@ float vec2_dot(vec2 a, vec2 b)
 	return a.x * b.x + a.y * b.y;
 }
 
+float vec2_dist(vec2 a, vec2 b)
+{
+	return sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
+}
+
 vec3 vec3_make(float x, float y, float z)
 {
 	vec3 v = {x, y, z};

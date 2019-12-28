@@ -14,7 +14,7 @@ float lod(float dist)
 	//return clamp(exp(-0.02 * dist) * lod_factor, 1, 64);
 	float z = length(dist);
  	float d = 0.02; // distance factor, if large the terrain will "pop" in more
- 	return exp(-(d*z)*(d*z)) * lod_factor;
+ 	return clamp(exp(-(d*z)*(d*z)) * lod_factor, 1, 8);
 }
 
 void main(void)

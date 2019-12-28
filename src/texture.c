@@ -6,9 +6,7 @@
 #include <GL/gl.h>
 #include "texture.h"
 #include "gmath.h"
-#include "noise.h"
-#include "voronoi.h"
-#include "vec.h"
+#include "imp.h"
 
 static GLuint make_rgb_texture(unsigned char *buf, int width, int height);
 static void rgbchannel(rgb *image, unsigned char *buf, int width, int height);
@@ -105,7 +103,6 @@ GLuint make_r_texture(unsigned char *image, int width, int height)
 	glBindTexture(GL_TEXTURE_2D, texnum);
 	glTexStorage2D(GL_TEXTURE_2D, 1, GL_R16, width, height);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RED, GL_UNSIGNED_BYTE, image);
-	// to prevent terrain terracing
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
@@ -116,7 +113,8 @@ GLuint make_r_texture(unsigned char *image, int width, int height)
 
 GLuint make_voronoi_texture(int width, int height)
 {
-	unsigned char *buf = do_voronoi(width, height);
+	unsigned char *buf = calloc(width * height * 3, sizeof(unsigned char));
+	do_voronoi(width, height, buf);
 	GLuint texnum = make_rgb_texture(buf, width, height);
 
 	free(buf);
@@ -126,7 +124,22 @@ GLuint make_voronoi_texture(int width, int height)
 
 GLuint make_river_texture(int width, int height)
 {
-	unsigned char *buf = voronoi_rivers(width, height);
+	unsigned char *buf = calloc(width * height * 3, sizeof(unsigned char));
+	voronoi_rivers(width, height, buf);
+	GLuint texnum = make_rgb_texture(buf, width, height);
+
+	free(buf);
+
+	return texnum;
+}
+
+GLuint make_mountain_texture(int width, int height)
+{
+	unsigned char *buf = calloc(width * height * 3, sizeof(unsigned char));
+	voronoi_mountains(width, height, buf);
+
+	 size_t isize = width * height * 3;
+
 	GLuint texnum = make_rgb_texture(buf, width, height);
 
 	free(buf);
@@ -153,6 +166,30 @@ GLuint make_perlin_texture(int width, int height)
 
 	return texnum;
 }
+
+GLuint init_depth_framebuffer(GLuint *depth_texture, int width, int height)
+{
+	GLuint depth_fbo;
+
+	glGenFramebuffers(1, &depth_fbo);
+	glGenTextures(1, depth_texture);
+	glBindTexture(GL_TEXTURE_2D, *depth_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	// attach depth texture as FBO's depth buffer
+	glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, *depth_texture, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	return depth_fbo;
+}
+
 
 static GLuint make_rgb_texture(unsigned char *buf, int width, int height)
 {
@@ -218,72 +255,5 @@ static unsigned char *gen_perlin_map(int size_x, int size_y)
 	}
 
 	return buf;
-}
-
-static void push(vec_int_t *stack, int x, int y)
-{
-	vec_push(stack, x);
-	vec_push(stack, y);
-}
-
-static int pop(vec_int_t *stack, int *x, int *y)
-{
-	if(stack->length < 2)
-		return 0; // it's empty
-
-	*y = vec_pop(stack);
-	*x = vec_pop(stack);
-
-	return 1;
-}
-
-int floodfill(int x, int y, unsigned char *image, int width, int height, unsigned char old, unsigned char new)
-{
- if(old == new) {
-  return 1;
- }
-
- int x1;
- int above, below;
- int size = 0;
-
- vec_int_t stack;
- vec_init(&stack);
- push(&stack, x, y);
-
- while(pop(&stack, &x, &y)) {
-  x1 = x;
-
-  while(x1 >= 0 && image[y * width + x1] == old) {
-   x1--;
-  }
-
-  x1++;
-  above = below = 0;
-  while(x1 < width && image[y * width + x1] == old) {
-   image[y * width + x1] = new;
-   size++;
-
-   if(!above && y > 0 && image[(y - 1) * width + x1] == old) {
-    push(&stack, x1, y - 1);
-    above = 1;
-   } else if(above && y > 0 && image[(y - 1) * width + x1] != old) {
-    above = 0;
-   }
-
-   if(!below && y < height - 1 && image[(y + 1) * width + x1] == old) {
-    push(&stack, x1, y + 1);
-    below = 1;
-   }
-   else if(below && y < height - 1 && image[(y + 1) * width + x1] != old) {
-    below = 0;
-   }
-
-   x1++;
-  }
- }
-
- vec_deinit(&stack);
- return size;
 }
 

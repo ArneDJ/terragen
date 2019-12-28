@@ -1,165 +1,33 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 #include <SDL2/SDL.h>
 #include <GL/glew.h>
 #include <GL/gl.h>
 #include "gmath.h"
-#include "shader.h"
-#include "mesh.h"
 #include "camera.h"
+#include "mesh.h"
+#include "shader.h"
 #include "texture.h"
-#include "noise.h"
+#include "imp.h"
 #include "voronoi.h"
+#define IIR_GAUSS_BLUR_IMPLEMENTATION
+#include "gauss.h"
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 1080
 
-#define TERRAIN_WIDTH 64
-#define HEIGHTMAP_RES 2048
+enum celltype {
+	COASTAL,
+	INLAND,
+	MOUNTAIN,
+};
 
-#define DTEX_WIDTH 1024
-#define DTEX_HEIGHT 1024
+struct vorcell {
+	vec2 center;
+	enum celltype type;
+        jcv_site site;
+};
 
-static SDL_Window *init_window(int width, int height);
-static SDL_GLContext init_glcontext(SDL_Window *window);
-
-static GLuint depth_texture;
-
-static GLuint vao;
-
-static unsigned char *gen_terrain_map(int size_x, int size_y)
-{
-	const size_t len = size_x * size_y;
-	unsigned char *buf = calloc(len, sizeof(unsigned char));
-
-	int nbuf = 0;
-	for(int x = 0; x < size_x; x++) {
-		for(int y = 0; y < size_y; y++) {
-			float z = fbm_noise(0.5*x, 0.5*y, 0.005, 2.5, 2.0);
-			if (z < 0.55) {
-				//z = 0.0;
-				buf[nbuf++] = 0.0;
-			} else {
-				//z = 1.0;
-				buf[nbuf++] = 128.0;
-			}
-		}
-	}
-
-	unsigned char *cpy = calloc(len, sizeof(unsigned char));
-	const unsigned char greyclr = 100.0;
-	const unsigned char lightgrey = 200.0;
-
-	for(int x = 0; x < size_x; x++) {
-		for(int y = 0; y < size_y; y++) {
-			int index = y * size_y + x;
-			if (buf[index] == 128.0) {
-				memcpy(cpy, buf, size_x * size_y);
-				int size = floodfill(x, y, cpy, size_x, size_y, buf[index], greyclr);
-				if (size < 500) {
-					floodfill(x, y, buf, size_x, size_y, buf[index], 0.0);
-				} else {
-					floodfill(x, y, buf, size_x, size_y, buf[index], greyclr);
-				}
-			}
-		} 
-	}
-
-	for (int x = 0; x < size_x; x++) {
-		for (int y = 0; y < size_y; y++) {
-			int index = y * size_y + x;
-			if (buf[index] == 0.0) {
-				memcpy(cpy, buf, size_x * size_y);
-				int size = floodfill(x, y, cpy, size_x, size_y, buf[index], lightgrey);
-				if (size < 50000) {
-					floodfill(x, y, buf, size_x, size_y, buf[index], 128.0);
-				} else {
-					floodfill(x, y, buf, size_x, size_y, buf[index], lightgrey);
-				}
-			}
-
-		}
-	}
-
-	for(int x = 0; x < size_x; x++) {
-		for(int y = 0; y < size_y; y++) {
-			int index = y * size_y + x;
-			if (buf[index] == greyclr) {
-				floodfill(x, y, buf, size_x, size_y, buf[index], 128.0);
-
-			} else if (buf[index] == lightgrey) {
-				floodfill(x, y, buf, size_x, size_y, buf[index], 0.0);
-			}
-		}
-	}
-
-	free(cpy);
-	return buf;
-}
-
-GLuint make_terrain_texture(int width, int height)
-{
-	unsigned char *buf = gen_terrain_map(width, height);
-	GLuint texnum = make_r_texture(buf, width, height);
-
-	free(buf);
-
-	return texnum;
-}
-
-static GLuint init_depth_framebuffer(void)
-{
-	GLuint depth_fbo;
-
-	glGenFramebuffers(1, &depth_fbo);
-	glGenTextures(1, &depth_texture);
-	glBindTexture(GL_TEXTURE_2D, depth_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, DTEX_WIDTH, DTEX_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-	// attach depth texture as FBO's depth buffer
-	glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_texture, 0);
-	glDrawBuffer(GL_NONE);
-	glReadBuffer(GL_NONE);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	return depth_fbo;
-}
-
-float terrain_height(float x, float y, float freq, float lacun, float gain)
-{
-	float noise = fbm_noise(x, y, freq, lacun, gain);
-
-	// if the frequency is too low the terrain will look "terraced" or "blocky", to prevent this increase the frequancy
-	if (noise > 0.48)	
-		noise = lerp(0.28, 0.75, noise) + (0.02 * fbm_noise(x*64.0, y*64.0, freq, lacun, gain));
-		//noise = lerp(0.28, 0.75, noise);
-		//noise = lerp(0.28, 0.75, noise) + (0.02 * worley_noise(0.05*x, 0.05*y));
-
-	float mountains = 1.0 * (1.0 - sqrt(worley_noise(0.01*x, 0.015*y))); //this should always be between 0 an 1
-	//mountains *= noise * pow(mountains, noise); // correction so mountains don't spawn in seas
-	mountains *= noise;
-	float ridge = 1.5 *  sqrt(worley_noise(x * 0.015, y * 0.01));
-	ridge *= noise * pow(ridge, noise); 
-
-	float range = fbm_noise(x*1.5, y*1.5, freq, lacun, gain);
-	range = smoothstep(0.6, 0.8, range); // sigmoid correction so mountains and terrain transition appears smooth
-	range = clamp(range, 0.0, 1.0);
-
-	mountains *= range;
-	mountains *= 0.25;
-
-	ridge *= range;
-	ridge *= 0.25;
-
-	noise = clamp(noise + ridge + mountains, 0.0, 0.99);
-	return noise; //this should always return something between 0 and 1
-}
-	
 struct object {
 	struct mesh m;
 	GLuint texture;
@@ -170,18 +38,9 @@ struct object {
 	struct AABB bbox;
 };
 
-struct map {
-	struct mesh m;
-	GLuint shader;
-	GLuint heightmap;
-	GLuint texture;
-};
-
 struct terrain {
 	struct mesh m;
 	GLuint shader;
-	struct triangle *surface;
-	struct mesh surface_mesh; /* for debugging */
 	GLuint heightmap;
 	GLuint texture[5];
 };
@@ -192,101 +51,46 @@ struct water {
 	GLuint diffuse;
 	GLuint normal;
 	GLuint depthmap;
+	GLuint depthtexture;
 	GLuint depth_fbo;
 };
 
-struct scene {
-	struct terrain terrain;
-	struct water water;
-	struct object skybox;
-	struct object object;
-	struct map map;
-	GLuint heightmap;
-};
+static GLuint make_terrain_heightmap(unsigned int res);
 
-struct context {
-	struct scene scene;
-	struct camera camera;
-	float delta;
-};
-
-vec3 fcolor;
-float gtime;
-
-struct map make_map(void) 
+static struct object make_skybox(void)
 {
-	struct map map;
-
-	map.m = make_grid_mesh(1, 1, 256.0); 
-
+	struct object skybox = {0};
 	struct shader pipeline[] = {
-		{GL_VERTEX_SHADER, "data/shader/mapv.glsl"},
-		{GL_FRAGMENT_SHADER, "data/shader/mapf.glsl"},
-		{GL_NONE, NULL}
-	};
-	map.shader = load_shaders(pipeline);
-
-	//map.texture = make_voronoi_texture(1024, 1024);
-	//map.texture = make_worley_texture(512, 512);
-	map.texture = make_perlin_texture(512, 512);
-
-	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
-	glUseProgram(map.shader);
-	glUniformMatrix4fv(glGetUniformLocation(map.shader, "project"), 1, GL_FALSE, project.f);
-
-	return map;
-}
-
-static vec3 sample_height(float x, float z)
-{
-	float amplitude = 8.0;
-	return vec3_make(x, amplitude * terrain_height(x*16, z*16, 0.004, 2.5, 2.0), z);
-}
-
-struct object make_standard_object(void)
-{
-	struct object obj;
-	struct shader pipeline[] = {
-		{GL_VERTEX_SHADER, "data/shader/cubev.glsl"},
-		{GL_FRAGMENT_SHADER, "data/shader/cubef.glsl"},
+		{GL_VERTEX_SHADER, "data/shader/skyboxv.glsl"},
+		{GL_FRAGMENT_SHADER, "data/shader/skyboxf.glsl"},
 		{GL_NONE, NULL}
 	};
 
-	obj.shader = load_shaders(pipeline);
-	obj.m = make_cube_mesh();
-	vec3 center = {25.0, 25.0, 25.0};
-	obj.bbox.c = center;
-	obj.bbox.r[0] = 0.5;
-	obj.bbox.r[1] = 0.5;
-	obj.bbox.r[2] = 0.5;
-
-	obj.texture = load_dds_texture("media/texture/placeholder.dds");
-
+	skybox.shader = load_shaders(pipeline);
 	mat4 model = IDENTITY_MATRIX;
 	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
-	glUseProgram(obj.shader);
-	glUniformMatrix4fv(glGetUniformLocation(obj.shader, "project"), 1, GL_FALSE, project.f);
-	mat4_translate(&model, obj.bbox.c);
-	glUniformMatrix4fv(glGetUniformLocation(obj.shader, "model"), 1, GL_FALSE, model.f);
+	glUseProgram(skybox.shader);
+	glUniformMatrix4fv(glGetUniformLocation(skybox.shader, "project"), 1, GL_FALSE, project.f);
 
-	return obj;
+	skybox.m = make_cube_mesh();
+
+	return skybox;
 }
 
-void display_standard_object(struct object *obj)
+static void display_skybox(struct object *sky)
 {
-	mat4 model = IDENTITY_MATRIX;
-	mat4_translate(&model, obj->bbox.c);
+	glUseProgram(sky->shader);
+	glDisable(GL_CULL_FACE);
+	glDepthFunc(GL_LEQUAL);
 
-	glUseProgram(obj->shader);
-	glUniform3fv(glGetUniformLocation(obj->shader, "fcolor"), 1, fcolor.f);
-	glUniformMatrix4fv(glGetUniformLocation(obj->shader, "model"), 1, GL_FALSE, model.f);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, obj->texture);
-	glBindVertexArray(obj->m.VAO);
-	glDrawArrays(GL_TRIANGLES, 0, obj->m.vcount);
+	glBindVertexArray(sky->m.VAO);
+	glDrawArrays(GL_TRIANGLES, 0, sky->m.vcount);
+
+	glDepthFunc(GL_LESS);
+	glEnable(GL_CULL_FACE);
 }
 
-struct water make_water(GLuint depthmap)
+static struct water make_water(GLuint depthmap)
 {
 	struct water wat;
 	struct shader pipeline[] = {
@@ -309,7 +113,7 @@ struct water make_water(GLuint depthmap)
 	return wat;
 }
 
-void display_water(struct water *wat)
+static void display_water(struct water *wat)
 {
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glUseProgram(wat->shader);
@@ -321,70 +125,14 @@ void display_water(struct water *wat)
 	glBindTexture(GL_TEXTURE_2D, wat->normal);
 	glUniform1i(glGetUniformLocation(wat->shader, "water_depth_buffer"), 2);
 	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_2D, depth_texture);
+	glBindTexture(GL_TEXTURE_2D, wat->depthtexture);
 	glBindVertexArray(wat->m.VAO);
 	glPatchParameteri(GL_PATCH_VERTICES, 3);
 	glDrawArrays(GL_PATCHES, 0, wat->m.vcount);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
-void display_map(struct map *map)
-{
-	glUseProgram(map->shader);
-	glUniform1i(glGetUniformLocation(map->shader, "voronoi"), 0);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, map->texture);
-	glUniform1i(glGetUniformLocation(map->shader, "depth_map"), 1);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, depth_texture);
-	glBindVertexArray(map->m.VAO);
-	glDrawArrays(GL_TRIANGLES, 0, map->m.vcount);
-}
-
-struct object make_skybox(void)
-{
-	struct object skybox = {0};
-	struct shader pipeline[] = {
-		{GL_VERTEX_SHADER, "data/shader/skyboxv.glsl"},
-		{GL_FRAGMENT_SHADER, "data/shader/skyboxf.glsl"},
-		{GL_NONE, NULL}
-	};
-
-	skybox.shader = load_shaders(pipeline);
-	mat4 model = IDENTITY_MATRIX;
-	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
-	glUseProgram(skybox.shader);
-	glUniformMatrix4fv(glGetUniformLocation(skybox.shader, "project"), 1, GL_FALSE, project.f);
-
-	skybox.m = make_cube_mesh();
-
-	return skybox;
-}
-
-void display_skybox(struct object *sky)
-{
-	glUseProgram(sky->shader);
-	glDisable(GL_CULL_FACE);
-	glDepthFunc(GL_LEQUAL);
-
-	glBindVertexArray(sky->m.VAO);
-	glDrawArrays(GL_TRIANGLES, 0, sky->m.vcount);
-
-	glDepthFunc(GL_LESS);
-	glEnable(GL_CULL_FACE);
-}
-
-void display_static_object(struct object *obj)
-{
-	glUseProgram(obj->shader);
-	mat4 model = IDENTITY_MATRIX;
-	mat4_translate(&model, obj->translation);
-
-	glBindVertexArray(obj->m.VAO);
-	glDrawArrays(GL_TRIANGLES, 0, obj->m.vcount);
-}
-
-struct terrain make_terrain(GLuint heightmap)
+static struct terrain make_terrain(int resolution)
 {
 	struct terrain ter = {0};
 
@@ -398,7 +146,7 @@ struct terrain make_terrain(GLuint heightmap)
 	ter.shader = load_shaders(pipeline);
 	ter.m = make_patch_mesh(64,64, 1.0);
 
-	ter.heightmap = make_terrain_texture(HEIGHTMAP_RES, HEIGHTMAP_RES);
+	ter.heightmap = make_terrain_heightmap(resolution);
 	ter.texture[0] = load_dds_texture("media/texture/grass.dds");
 	ter.texture[1] = load_dds_texture("media/texture/rock.dds");
 	ter.texture[2] = load_dds_texture("media/texture/graydirt.dds");
@@ -411,7 +159,7 @@ struct terrain make_terrain(GLuint heightmap)
 	return ter;
 }
 
-void display_terrain(struct terrain *ter)
+static void display_terrain(struct terrain *ter)
 {
 	glUseProgram(ter->shader);
 
@@ -423,7 +171,7 @@ void display_terrain(struct terrain *ter)
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, ter->texture[1]);
 
-	glUniform1i(glGetUniformLocation(ter->shader, "sand"), 2);
+	glUniform1i(glGetUniformLocation(ter->shader, "gravel"), 2);
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, ter->texture[2]);
 
@@ -443,104 +191,328 @@ void display_terrain(struct terrain *ter)
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
-void display_scene(struct scene *scene)
+// Remaps the point from the input space to image space
+static inline jcv_point remap(const jcv_point* pt, const jcv_point* min, const jcv_point* max, int width, int height)
 {
-	glViewport(0, 0, DTEX_WIDTH, DTEX_HEIGHT);
-	glBindFramebuffer(GL_FRAMEBUFFER, scene->water.depth_fbo);
-	glClear(GL_DEPTH_BUFFER_BIT);
-	display_terrain(&scene->terrain);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	display_terrain(&scene->terrain);
-	display_water(&scene->water);
-	display_standard_object(&scene->object);
-	display_skybox(&scene->skybox);
-	display_map(&scene->map);
+    jcv_point p;
+    p.x = (pt->x - min->x)/(max->x - min->x) * (jcv_real)width;
+    p.y = (pt->y - min->y)/(max->y - min->y) * (jcv_real)height;
+    return p;
 }
 
-void load_scene(struct scene *scene)
+static GLuint make_terrain_heightmap(unsigned int res)
 {
+	const size_t size = res * res;
+	unsigned char *perlin = calloc(size, sizeof(unsigned char));
+	unsigned char *mountainr = calloc(size, sizeof(unsigned char));
+	unsigned char *image = calloc(size, sizeof(unsigned char));
+	unsigned char *cpy = calloc(size, sizeof(unsigned char));
 
-	scene->skybox = make_skybox();
-	scene->terrain = make_terrain(scene->heightmap);
-	scene->water = make_water(scene->heightmap);
-	scene->object = make_standard_object();
-	scene->map = make_map();
+	unsigned char red = 255.0;
+	unsigned char black = 0.0;
+	unsigned char water = 0.0;
+	unsigned char land = 100.0;
+	unsigned char coastclr = 200.0;
 
-	scene->terrain.texture[4] = scene->map.texture;
-}
-
-void update_context(struct context *context)
-{
-	const Uint8 *keystates = SDL_GetKeyboardState(NULL);
-	context->camera.speed = 1.0;
-	if (keystates[SDL_SCANCODE_LSHIFT]) {
-		context->camera.speed = 4.0;
+	int nbuf = 0;
+	for(int x = 0; x < res; x++) {
+		for(int y = 0; y < res; y++) {
+			float z = fbm_noise(0.5*x, 0.5*y, 0.005, 2.5, 2.0);
+			perlin[nbuf] = z * 255.0;
+			if (z > 0.55) {
+				z = land;
+			} else {
+				z = water;
+			}
+			image[nbuf++] = z;
+		}
 	}
 
-	update_free_camera(&context->camera, context->delta);
-	//update_strategy_camera(&context->camera, context->delta);
-	mat4 view = make_view_matrix(context->camera.eye, context->camera.center, context->camera.up);
-	mat4 skybox_view = view;
-	skybox_view.f[12] = 0.0;
-	skybox_view.f[13] = 0.0;
-	skybox_view.f[14] = 0.0;
+	const int MIN_LAKE_SIZE = res * 2;
+	const int MIN_ISLAND_SIZE = res;
 
-	fcolor.x = 0.0;
-	fcolor.y = 0.0;
-	fcolor.z = 0.0;
-	if (test_ray_AABB(context->camera.eye, context->camera.center, context->scene.object.bbox)) {
-		fcolor.y = 0.5;
+	/* remove small lakes */
+	memcpy(cpy, image, size);
+	for (int x = 0; x < res; x++) {
+		for (int y = 0; y < res; y++) {
+			int index = y * res + x ;
+			int size = floodfill(x, y, cpy, res, res, water, land);
+			if (size < MIN_LAKE_SIZE && size > 1) {
+				floodfill(x, y, image, res, res, water, land);
+			}
+		}
 	}
 
-	glUseProgram(context->scene.terrain.shader);
-	glUniformMatrix4fv(glGetUniformLocation(context->scene.terrain.shader, "view"), 1, GL_FALSE, view.f);
-	glUniform3fv(glGetUniformLocation(context->scene.terrain.shader, "view_center"), 1, context->camera.center.f);
-	glUniform3fv(glGetUniformLocation(context->scene.terrain.shader, "view_eye"), 1, context->camera.eye.f);
-	glUseProgram(context->scene.water.shader);
-	glUniformMatrix4fv(glGetUniformLocation(context->scene.water.shader, "view"), 1, GL_FALSE, view.f);
-	glUniform3fv(glGetUniformLocation(context->scene.water.shader, "view_dir"), 1, context->camera.center.f);
-	glUniform3fv(glGetUniformLocation(context->scene.water.shader, "view_eye"), 1, context->camera.eye.f);
-	glUniform1f(glGetUniformLocation(context->scene.water.shader, "time"), gtime);
-	glUseProgram(context->scene.object.shader);
-	glUniformMatrix4fv(glGetUniformLocation(context->scene.object.shader, "view"), 1, GL_FALSE, view.f);
-	glUseProgram(context->scene.map.shader);
-	glUniformMatrix4fv(glGetUniformLocation(context->scene.map.shader, "view"), 1, GL_FALSE, view.f);
-	glUseProgram(context->scene.skybox.shader);
-	glUniformMatrix4fv(glGetUniformLocation(context->scene.skybox.shader, "view"), 1, GL_FALSE, skybox_view.f);
+	/* remove small islands */
+	memcpy(cpy, image, size);
+	for (int x = 0; x < res; x++) {
+		for (int y = 0; y < res; y++) {
+			int index = y * res + x ;
+			int size = floodfill(x, y, cpy, res, res, land, water);
+			if (size < MIN_ISLAND_SIZE && size > 1) {
+				floodfill(x, y, image, res, res, land, water);
+			}
+		}
+	}
+
+	/* generate site points */
+	const int MAX_SITES = 500;
+	jcv_point site[MAX_SITES];
+
+	int nsite = 0;
+	while (nsite < MAX_SITES) {
+		float x = frand(res);
+		float y = frand(res);
+		int index = (int)y * res + (int)x;
+		if (image[index] == land) {
+			site[nsite].x = x;
+			site[nsite].y = y;
+			nsite++;
+		}
+	}
+
+	jcv_diagram diagram;
+	memset(&diagram, 0, sizeof(jcv_diagram));
+	jcv_diagram_generate(MAX_SITES, site, 0, 0, &diagram);
+
+	/* plot the sites */
+	unsigned char sitecolor = 155.0;
+	const jcv_site *sites = jcv_diagram_get_sites(&diagram);
+	/*
+	for (int i = 0; i < diagram.numsites; i++) {
+		const jcv_site *site = &sites[i];
+		jcv_point p = site->p;
+
+		plot((int)p.x, (int)p.y, image, res, res, 1, &sitecolor);
+	}
+	*/
+
+	/* find the coastal cells */
+	/* points don't account for image space! convert them! */
+	struct vorcell vcell[MAX_SITES];
+	for (int i = 0; i < MAX_SITES; i++) {
+		vcell[i].site = sites[i];
+		vcell[i].center.x = sites[i].p.x;
+		vcell[i].center.y = sites[i].p.y;
+
+		const jcv_graphedge *e = vcell[i].site.edges;
+
+		while (e) {
+			jcv_point p1 = remap(&e->pos[0], &diagram.min, &diagram.max, res, res);
+			jcv_point p2 = remap(&e->pos[1], &diagram.min, &diagram.max, res, res);
+			const int index1 = (int)p1.y * res + (int)p1.x;
+			const int index2 = (int)p2.y * res + (int)p2.x;
+			if (image[index1] == water || image[index2] == water) {
+				vcell[i].type = COASTAL;
+				break;
+			} else {
+				vcell[i].type = INLAND;
+			}
+			e = e->next;
+		}
+	}
+
+	iir_gauss_blur(res, res, 1, image, 5.0);
+
+	/* ADD MOUNTAINS */
+	const float MIN_MOUNTAIN_HEIGHT = 0.7;
+	for (int i = 0; i < MAX_SITES; i++) {
+		const int index = (int)vcell[i].center.y * res + (int)vcell[i].center.x;
+		const float hsample = perlin[index]/255.f;
+		if (hsample > MIN_MOUNTAIN_HEIGHT && vcell[i].type == INLAND) {
+			vcell[i].type = MOUNTAIN;
+			const jcv_graphedge *e = vcell[i].site.edges;
+
+			while (e) {
+				draw_triangle(vcell[i].center.x, vcell[i].center.y, e->pos[0].x, e->pos[0].y, e->pos[1].x, e->pos[1].y, mountainr, res, res, 1, &red);
+				e = e->next;
+			}
+		}
+	}
+
+	iir_gauss_blur(res, res, 1, mountainr, 10.0);
+
+	for (int x = 0; x < res; x++) {
+		for (int y = 0; y < res; y++) {
+			int index = y * res + x;
+
+			float mountains = 1.0 - (sqrt(worley_noise(0.02*x, 0.030*y)));
+			float ridge = worley_noise(x * 0.03, y * 0.02);
+
+			float range = mountainr[index]/255.f;
+
+			mountains *= range * 0.6;
+			ridge *= range * 0.6;
+
+			image[index] = 255.0 * (image[index]/255.f + ((mountains + ridge) / 2.0));
+
+		}
+	}
+
+	/* ADD RIVERS */
+	/* maker river candidate network */
+	srand(time(NULL));
+	const float RIVER_WIDTH = 8.0;
+    	unsigned char color_line = 0.0;
+	unsigned char *riverr = calloc(size, sizeof(unsigned char));
+	for (int i = 0; i < size; i++) {
+		riverr[i] = 255.0;
+	}
+	//memcpy(riverr, image, size);
+
+	for (int i = 0; i < 20; i++) {
+		int startindex = rand() % MAX_SITES;
+		const jcv_site *rsite = &vcell[startindex].site;
+
+		if (vcell[startindex].type == MOUNTAIN) {
+			for (int i = 0; i < 500; i++) {
+				jcv_point c1 = remap(&rsite->p, &diagram.min, &diagram.max, res, res);
+				const jcv_graphedge *e = rsite->edges;
+				rsite = e->neighbor;
+				jcv_point c2 = remap(&rsite->p, &diagram.min, &diagram.max, res, res);
+				draw_thick_line(c1.x, c1.y, c2.x, c2.y, riverr, res, res, 1, &color_line, RIVER_WIDTH);
+				int out = 0;
+				while (e) {
+					jcv_point p1 = remap(&e->pos[0], &diagram.min, &diagram.max, res, res);
+					jcv_point p2 = remap(&e->pos[1], &diagram.min, &diagram.max, res, res);
+					const int index1 = (int)p1.y * res + (int)p1.x;
+					const int index2 = (int)p2.y * res + (int)p2.x;
+
+					if (image[index1] == water) {
+						draw_thick_line(c2.x, c2.y, p1.x, p1.y, riverr, res, res, 1, &color_line, RIVER_WIDTH);
+						out = 1;
+						break;
+					} else if (image[index2] == water) {
+						draw_thick_line(c2.x, c2.y, p2.x, p2.y, riverr, res, res, 1, &color_line, RIVER_WIDTH);
+						out = 1;
+						break;
+					}
+					e = e->next;
+				}
+
+				if (out) {
+					break;
+				}
+			}
+
+		}
+
+	}
+	iir_gauss_blur(res, res, 1, riverr, 5.0);
+	for (int i = 0; i < size; i++) {
+		image[i] = 255.0 * (image[i]/255.f) * (riverr[i]/255.f);
+	}
+
+
+	/*
+        const jcv_edge *edge = jcv_diagram_get_edges(&diagram);
+        while (edge) {
+		draw_line((int)edge->pos[0].x, (int)edge->pos[0].y, (int)edge->pos[1].x, (int)edge->pos[1].y, image, res, res, 1, &sitecolor);
+		edge = jcv_diagram_get_next_edge(edge);
+        }
+	*/
+
+
+	GLuint texnum = make_r_texture(image, res, res);
+
+	jcv_diagram_free(&diagram);
+	free(image);
+	free(mountainr);
+	free(cpy);
+	free(perlin);
+	free(riverr);
+	return texnum;
 }
 
-void run_game(SDL_Window *window)
+static void run_loop(SDL_Window *window)
 {
-	struct context context = {0};
-	context.camera = init_camera(10.0, 8.0, 10.0, 90.0, 0.2);
-	load_scene(&context.scene);
-
-	// INITIALIZE DEPTH FRAME BUFFER //
-	context.scene.water.depth_fbo = init_depth_framebuffer();
-
-	// RENDER LOOP //
 	float start, end = 0.0;
 	SDL_SetRelativeMouseMode(SDL_TRUE);
+	struct camera cam = init_camera(1.0, 1.0, 1.0, 90.0, 0.2);
 
+	struct terrain terra = make_terrain(2048);
+	struct object sky = make_skybox();
+	struct mesh cube = make_grid_mesh(1, 1, 10.0);
+	GLuint texture = terra.heightmap;
+
+	// INITIALIZE DEPTH FRAME BUFFER //
+	struct water wat = make_water(terra.heightmap);
+	wat.depth_fbo = init_depth_framebuffer(&wat.depthtexture, 1024, 1024);
+
+	struct shader pipeline[] = {
+		{GL_VERTEX_SHADER, "data/shader/cubev.glsl"},
+		{GL_FRAGMENT_SHADER, "data/shader/cubef.glsl"},
+		{GL_NONE, NULL}
+	};
+
+	GLuint program = load_shaders(pipeline);
+
+	mat4 model = IDENTITY_MATRIX;
+	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
+	glUseProgram(program);
+	glUniformMatrix4fv(glGetUniformLocation(program, "project"), 1, GL_FALSE, project.f);
+	glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, model.f);
+
+	/* MASTER LOOP */
 	SDL_Event event;
 	while (event.type != SDL_QUIT) {
-		gtime = (float)SDL_GetTicks();
-		start = gtime * 0.001;
-		context.delta = start - end;
-
+		const float gtime = (float)SDL_GetTicks();
+		start = gtime;
+		float delta = start - end;
 		while(SDL_PollEvent(&event));
-		update_context(&context);
-		display_scene(&context.scene);
 
+		/* update camera */
+		update_free_camera(&cam, 0.001 * delta);
+		mat4 view = make_view_matrix(cam.eye, cam.center, cam.up);
+		mat4 skybox_view = view;
+		skybox_view.f[12] = 0.0;
+		skybox_view.f[13] = 0.0;
+		skybox_view.f[14] = 0.0;
+
+		/* update scene */
+		glUseProgram(program);
+		glUniformMatrix4fv(glGetUniformLocation(program, "view"), 1, GL_FALSE, view.f);
+		glUseProgram(terra.shader);
+		glUniformMatrix4fv(glGetUniformLocation(terra.shader, "view"), 1, GL_FALSE, view.f);
+		glUniformMatrix4fv(glGetUniformLocation(terra.shader, "view"), 1, GL_FALSE, view.f);
+		glUniform3fv(glGetUniformLocation(terra.shader, "view_center"), 1, cam.center.f);
+		glUniform3fv(glGetUniformLocation(terra.shader, "view_eye"), 1, cam.eye.f);
+
+		glUseProgram(wat.shader);
+		glUniformMatrix4fv(glGetUniformLocation(wat.shader, "view"), 1, GL_FALSE, view.f);
+		glUniform3fv(glGetUniformLocation(wat.shader, "view_dir"), 1, cam.center.f);
+		glUniform3fv(glGetUniformLocation(wat.shader, "view_eye"), 1, cam.eye.f);
+		glUniform1f(glGetUniformLocation(wat.shader, "time"), gtime);
+
+		glUseProgram(sky.shader);
+		glUniformMatrix4fv(glGetUniformLocation(sky.shader, "view"), 1, GL_FALSE, skybox_view.f);
+
+		glViewport(0, 0, 1024, 1024);
+		glBindFramebuffer(GL_FRAMEBUFFER, wat.depth_fbo);
+		glClear(GL_DEPTH_BUFFER_BIT);
+		display_terrain(&terra);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+
+		/* render */
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(program);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glBindVertexArray(cube.VAO);
+		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glDrawArrays(GL_TRIANGLES, 0, cube.vcount);
+
+		display_terrain(&terra);
+		display_water(&wat);
+		display_skybox(&sky);
+
+		/* swap buffer */
 		SDL_GL_SwapWindow(window);
 		end = start;
 	}
 
-	glDeleteFramebuffers(1, &context.scene.water.depth_fbo);
 }
 
 static SDL_Window *init_window(int width, int height)
@@ -568,7 +540,7 @@ static SDL_GLContext init_glcontext(SDL_Window *window)
 		exit(EXIT_FAILURE);
 	}
 
-	glClearColor(0,0,0,1);
+	glClearColor(0, 0, 0, 1);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	glFrontFace(GL_CCW);
@@ -584,7 +556,7 @@ int main(int argc, char *argv[])
 	SDL_Window *window = init_window(WINDOW_WIDTH, WINDOW_HEIGHT);
 	SDL_GLContext glcontext = init_glcontext(window);
 
-	run_game(window);
+	run_loop(window);
 
 	SDL_GL_DeleteContext(glcontext);
 	SDL_DestroyWindow(window);
@@ -592,4 +564,3 @@ int main(int argc, char *argv[])
 
 	exit(EXIT_SUCCESS);
 }
-
