@@ -54,7 +54,7 @@ void draw_line(int x0, int y0, int x1, int y1, unsigned char *image, int width, 
 	}
 }
 
-void draw_thick_line(int x0, int y0, int x1, int y1, unsigned char *image, int width, int height, unsigned char *color, float wd)
+void draw_thick_line(int x0, int y0, int x1, int y1, unsigned char *image, int width, int height, int nchannels, unsigned char *color, float wd)
 {
 	int dx = abs(x1-x0), sx = x0 < x1 ? 1 : -1;
 	int dy = abs(y1-y0), sy = y0 < y1 ? 1 : -1;
@@ -62,19 +62,19 @@ void draw_thick_line(int x0, int y0, int x1, int y1, unsigned char *image, int w
 	float ed = dx+dy == 0 ? 1 : sqrt((float)dx*dx+(float)dy*dy);
 
 	for (wd = (wd+1)/2; ; ) {                                   /* pixel loop */
-		plot(x0,y0, image, width, height, 3, color);
+		plot(x0,y0, image, width, height, nchannels, color);
 		//plot(x0,y0, image, width, height, nchannels, max(0,255*(abs(err-dx+dy)/ed-wd+1)));
 		e2 = err; x2 = x0;
 		if (2*e2 >= -dx) {                                           /* x step */
 			for (e2 += dy, y2 = y0; e2 < ed*wd && (y1 != y2 || dx > dy); e2 += dx)
-				plot(x0, y2 += sy, image, width, height, 3, color);
+				plot(x0, y2 += sy, image, width, height, nchannels, color);
 			if (x0 == x1) 
 				break;
 			e2 = err; err -= dy; x0 += sx;
 		}
 		if (2*e2 <= dy) {                                            /* y step */
 			for (e2 = dx-e2; e2 < ed*wd && (x1 != x2 || dx < dy); e2 += dy)
-				plot(x2 += sx, y0, image, width, height, 3, color);
+				plot(x2 += sx, y0, image, width, height, nchannels, color);
 			if (y0 == y1) 
 				break;
 			err += dx; y0 += sy;
@@ -82,7 +82,7 @@ void draw_thick_line(int x0, int y0, int x1, int y1, unsigned char *image, int w
 	}
 }
 
-void draw_triangle(float x0, float y0, float x1, float y1, float x2, float y2, unsigned char *image, int width, int height, unsigned char *color)
+void draw_triangle(float x0, float y0, float x1, float y1, float x2, float y2, unsigned char *image, int width, int height, int nchannel, unsigned char *color)
 {
 	int area = orient(x0, y0, x1, y1, x2, y2);
 	if (area == 0)
@@ -111,7 +111,7 @@ void draw_triangle(float x0, float y0, float x1, float y1, float x2, float y2, u
 
 			// If p is on or inside all edges, render pixel.
 			if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
-				plot((int)px, (int)py, image, width, height, 3, color);
+				plot((int)px, (int)py, image, width, height, nchannel, color);
 			}
 		}
 	}
@@ -226,7 +226,7 @@ void make_river(const jcv_diagram *diagram, unsigned char *image, int width, int
 	}
 
 	for (int i = 0; i < RIVER_SIZE-1; i++) {
-		draw_thick_line(x[i], y[i], x[i+1], y[i+1], image, width, height, color_line, 24.0);
+		draw_thick_line(x[i], y[i], x[i+1], y[i+1], image, width, height, 3, color_line, 24.0);
 	}
 
 }
@@ -266,7 +266,7 @@ void do_voronoi(int width, int height, unsigned char *image)
 		const jcv_graphedge *e = site->edges;
 
 		while (e) {
-			draw_triangle(site->p.x, site->p.y, e->pos[0].x, e->pos[0].y, e->pos[1].x, e->pos[1].y, image, width, height, rcolor);
+			draw_triangle(site->p.x, site->p.y, e->pos[0].x, e->pos[0].y, e->pos[1].x, e->pos[1].y, image, width, height, 3, rcolor);
 			e = e->next;
 		}
 	}
@@ -354,7 +354,7 @@ static void draw_mountains(const jcv_diagram *diagram, unsigned char *image, int
    jcv_point p0 = remap(&ge->pos[0], &diagram->min, &diagram->max, width, height);
    jcv_point p1 = remap(&ge->pos[1], &diagram->min, &diagram->max, width, height);
 
-   draw_triangle(s.x, s.y, p0.x, p0.y, p1.x, p1.y, image, width, height, &rgb[0]);
+   draw_triangle(s.x, s.y, p0.x, p0.y, p1.x, p1.y, image, width, height, 1, &rgb[0]);
    ge = ge->next;
   }
 

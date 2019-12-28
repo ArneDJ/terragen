@@ -14,9 +14,9 @@ int floodfill(int x, int y, unsigned char *image, int width, int height, unsigne
 
 void draw_line(int x0, int y0, int x1, int y1, unsigned char* image, int width, int height, int nchannels, unsigned char* color);
 
-void draw_thick_line(int x0, int y0, int x1, int y1, unsigned char* image, int width, int height, unsigned char *color, float wd);
+void draw_thick_line(int x0, int y0, int x1, int y1, unsigned char* image, int width, int height, int nchannels, unsigned char *color, float wd);
 
-void draw_triangle(float x0, float y0, float x1, float y1, float x2, float y2, unsigned char *image, int width, int height, unsigned char *color);
+void draw_triangle(float x0, float y0, float x1, float y1, float x2, float y2, unsigned char *image, int width, int height, int nchannel, unsigned char *color);
 
 void draw_dist_triangle(float centerx, float centery, float x1, float y1, float x2, float y2, unsigned char *image, int width, int height);
 
