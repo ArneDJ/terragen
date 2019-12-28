@@ -28,10 +28,168 @@ struct vorcell {
         jcv_site site;
 };
 
-struct vorvertex {
-	vec2 v;
-	struct vorvertex *neighbors[3];
+struct object {
+	struct mesh m;
+	GLuint texture;
+	GLuint shader;
+	vec3 translation;
+	vec3 rotation;
+	vec3 scale;
+	struct AABB bbox;
 };
+
+struct terrain {
+	struct mesh m;
+	GLuint shader;
+	GLuint heightmap;
+	GLuint texture[5];
+};
+
+struct water {
+	struct mesh m;
+	GLuint shader;
+	GLuint diffuse;
+	GLuint normal;
+	GLuint depthmap;
+	GLuint depthtexture;
+	GLuint depth_fbo;
+};
+
+static GLuint make_terrain_heightmap(unsigned int res);
+
+static struct object make_skybox(void)
+{
+	struct object skybox = {0};
+	struct shader pipeline[] = {
+		{GL_VERTEX_SHADER, "data/shader/skyboxv.glsl"},
+		{GL_FRAGMENT_SHADER, "data/shader/skyboxf.glsl"},
+		{GL_NONE, NULL}
+	};
+
+	skybox.shader = load_shaders(pipeline);
+	mat4 model = IDENTITY_MATRIX;
+	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
+	glUseProgram(skybox.shader);
+	glUniformMatrix4fv(glGetUniformLocation(skybox.shader, "project"), 1, GL_FALSE, project.f);
+
+	skybox.m = make_cube_mesh();
+
+	return skybox;
+}
+
+static void display_skybox(struct object *sky)
+{
+	glUseProgram(sky->shader);
+	glDisable(GL_CULL_FACE);
+	glDepthFunc(GL_LEQUAL);
+
+	glBindVertexArray(sky->m.VAO);
+	glDrawArrays(GL_TRIANGLES, 0, sky->m.vcount);
+
+	glDepthFunc(GL_LESS);
+	glEnable(GL_CULL_FACE);
+}
+
+static struct water make_water(GLuint depthmap)
+{
+	struct water wat;
+	struct shader pipeline[] = {
+		{GL_VERTEX_SHADER, "data/shader/waterv.glsl"},
+		{GL_TESS_CONTROL_SHADER, "data/shader/watertc.glsl"},
+		{GL_TESS_EVALUATION_SHADER, "data/shader/waterte.glsl"},
+		{GL_FRAGMENT_SHADER, "data/shader/waterf.glsl"},
+		{GL_NONE, NULL}
+	};
+	wat.shader = load_shaders(pipeline);
+	wat.m = make_grid_mesh(64, 64, 1.0);
+	wat.depthmap = depthmap;
+	
+	wat.normal = load_dds_texture("media/texture/water_normal.dds");
+
+	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
+	glUseProgram(wat.shader);
+	glUniformMatrix4fv(glGetUniformLocation(wat.shader, "project"), 1, GL_FALSE, project.f);
+
+	return wat;
+}
+
+static void display_water(struct water *wat)
+{
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glUseProgram(wat->shader);
+	glUniform1i(glGetUniformLocation(wat->shader, "heightmap_terrain"), 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, wat->depthmap);
+	glUniform1i(glGetUniformLocation(wat->shader, "water_normal"), 1);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, wat->normal);
+	glUniform1i(glGetUniformLocation(wat->shader, "water_depth_buffer"), 2);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, wat->depthtexture);
+	glBindVertexArray(wat->m.VAO);
+	glPatchParameteri(GL_PATCH_VERTICES, 3);
+	glDrawArrays(GL_PATCHES, 0, wat->m.vcount);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+}
+
+static struct terrain make_terrain(int resolution)
+{
+	struct terrain ter = {0};
+
+	struct shader pipeline[] = {
+		{GL_VERTEX_SHADER, "data/shader/terrainv.glsl"},
+		{GL_TESS_CONTROL_SHADER, "data/shader/terraintc.glsl"},
+		{GL_TESS_EVALUATION_SHADER, "data/shader/terrainte.glsl"},
+		{GL_FRAGMENT_SHADER, "data/shader/terrainf.glsl"},
+		{GL_NONE, NULL}
+	};
+	ter.shader = load_shaders(pipeline);
+	ter.m = make_patch_mesh(64,64, 1.0);
+
+	ter.heightmap = make_terrain_heightmap(resolution);
+	ter.texture[0] = load_dds_texture("media/texture/grass.dds");
+	ter.texture[1] = load_dds_texture("media/texture/rock.dds");
+	ter.texture[2] = load_dds_texture("media/texture/graydirt.dds");
+	ter.texture[3] = load_dds_texture("media/texture/snowrocks.dds");
+
+	mat4 project = make_project_matrix(90, (float)WINDOW_WIDTH/(float)WINDOW_HEIGHT, 0.1, 200.0);
+	glUseProgram(ter.shader);
+	glUniformMatrix4fv(glGetUniformLocation(ter.shader, "project"), 1, GL_FALSE, project.f);
+
+	return ter;
+}
+
+static void display_terrain(struct terrain *ter)
+{
+	glUseProgram(ter->shader);
+
+	glUniform1i(glGetUniformLocation(ter->shader, "grass"), 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, ter->texture[0]);
+
+	glUniform1i(glGetUniformLocation(ter->shader, "stone"), 1);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, ter->texture[1]);
+
+	glUniform1i(glGetUniformLocation(ter->shader, "gravel"), 2);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, ter->texture[2]);
+
+	glUniform1i(glGetUniformLocation(ter->shader, "snow"), 3);
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, ter->texture[3]);
+
+	glUniform1i(glGetUniformLocation(ter->shader, "heightmap"), 4);
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, ter->heightmap);
+
+	glBindVertexArray(ter->m.VAO);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPatchParameteri(GL_PATCH_VERTICES, 4);
+	glDrawArrays(GL_PATCHES, 0, ter->m.vcount);
+
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+}
 
 // Remaps the point from the input space to image space
 static inline jcv_point remap(const jcv_point* pt, const jcv_point* min, const jcv_point* max, int width, int height)
@@ -42,7 +200,7 @@ static inline jcv_point remap(const jcv_point* pt, const jcv_point* min, const j
     return p;
 }
 
-static GLuint make_terrain(unsigned int res)
+static GLuint make_terrain_heightmap(unsigned int res)
 {
 	const size_t size = res * res;
 	unsigned char *perlin = calloc(size, sizeof(unsigned char));
@@ -272,9 +430,14 @@ static void run_loop(SDL_Window *window)
 	SDL_SetRelativeMouseMode(SDL_TRUE);
 	struct camera cam = init_camera(1.0, 1.0, 1.0, 90.0, 0.2);
 
+	struct terrain terra = make_terrain(2048);
+	struct object sky = make_skybox();
 	struct mesh cube = make_grid_mesh(1, 1, 10.0);
-	GLuint texture = make_terrain(2048);
-	//GLuint texture = make_voronoi_texture(4096, 4096);
+	GLuint texture = terra.heightmap;
+
+	// INITIALIZE DEPTH FRAME BUFFER //
+	struct water wat = make_water(terra.heightmap);
+	wat.depth_fbo = init_depth_framebuffer(&wat.depthtexture, 1024, 1024);
 
 	struct shader pipeline[] = {
 		{GL_VERTEX_SHADER, "data/shader/cubev.glsl"},
@@ -293,26 +456,57 @@ static void run_loop(SDL_Window *window)
 	/* MASTER LOOP */
 	SDL_Event event;
 	while (event.type != SDL_QUIT) {
-		start = (float)SDL_GetTicks();
+		const float gtime = (float)SDL_GetTicks();
+		start = gtime;
 		float delta = start - end;
 		while(SDL_PollEvent(&event));
 
 		/* update camera */
 		update_free_camera(&cam, 0.001 * delta);
 		mat4 view = make_view_matrix(cam.eye, cam.center, cam.up);
+		mat4 skybox_view = view;
+		skybox_view.f[12] = 0.0;
+		skybox_view.f[13] = 0.0;
+		skybox_view.f[14] = 0.0;
 
 		/* update scene */
 		glUseProgram(program);
 		glUniformMatrix4fv(glGetUniformLocation(program, "view"), 1, GL_FALSE, view.f);
+		glUseProgram(terra.shader);
+		glUniformMatrix4fv(glGetUniformLocation(terra.shader, "view"), 1, GL_FALSE, view.f);
+		glUniformMatrix4fv(glGetUniformLocation(terra.shader, "view"), 1, GL_FALSE, view.f);
+		glUniform3fv(glGetUniformLocation(terra.shader, "view_center"), 1, cam.center.f);
+		glUniform3fv(glGetUniformLocation(terra.shader, "view_eye"), 1, cam.eye.f);
+
+		glUseProgram(wat.shader);
+		glUniformMatrix4fv(glGetUniformLocation(wat.shader, "view"), 1, GL_FALSE, view.f);
+		glUniform3fv(glGetUniformLocation(wat.shader, "view_dir"), 1, cam.center.f);
+		glUniform3fv(glGetUniformLocation(wat.shader, "view_eye"), 1, cam.eye.f);
+		glUniform1f(glGetUniformLocation(wat.shader, "time"), gtime);
+
+		glUseProgram(sky.shader);
+		glUniformMatrix4fv(glGetUniformLocation(sky.shader, "view"), 1, GL_FALSE, skybox_view.f);
+
+		glViewport(0, 0, 1024, 1024);
+		glBindFramebuffer(GL_FRAMEBUFFER, wat.depth_fbo);
+		glClear(GL_DEPTH_BUFFER_BIT);
+		display_terrain(&terra);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
 
 		/* render */
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		glUseProgram(program);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texture);
 		glBindVertexArray(cube.VAO);
 		//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glDrawArrays(GL_TRIANGLES, 0, cube.vcount);
+
+		display_terrain(&terra);
+		display_water(&wat);
+		display_skybox(&sky);
 
 		/* swap buffer */
 		SDL_GL_SwapWindow(window);
